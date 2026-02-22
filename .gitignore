@@ -1,0 +1,33 @@
+# dependencies
+node_modules
+
+# env
+.env
+.env.local
+.env.*
+
+# next
+.next
+out
+
+# builds
+dist
+build
+
+# logs
+*.log
+
+# editor
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# drizzle/prisma
+drizzle
+prisma/migrations
+
+# docker volumes
+docker-data

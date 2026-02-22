@@ -1,0 +1,40 @@
+
+services:
+
+  supertokens:
+    image: registry.supertokens.io/supertokens/supertokens-postgresql
+    container_name: supertokens_core
+    depends_on:
+      - postgres
+    ports:
+      - "3567:3567"
+    environment:
+      POSTGRESQL_CONNECTION_URI: "postgresql://postgres:postgres@postgres:5432/ai_community_db"
+
+  postgres:
+    image: postgres:15
+    container_name: ai_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ai_community_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: ai_pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
