@@ -1,5 +1,5 @@
-import { db } from "../index";
-import { communities } from "../db/schema";
+import { db } from "../index.js";
+import { communities } from "../db/community.schema";
 import { eq, and } from "drizzle-orm";
 
 export async function createCommunity(data: any) {

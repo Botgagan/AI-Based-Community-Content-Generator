@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
+import { url } from "@/lib/axiosInstance";
 
 type CommunityForm = {
   name: string;
@@ -14,8 +15,8 @@ type CommunityForm = {
 
 export default function AddCommunityPage() {
   const router = useRouter();
-
   const [loading, setLoading] = useState(false);
+
   const [form, setForm] = useState<CommunityForm>({
     name: "",
     description: "",
@@ -23,6 +24,8 @@ export default function AddCommunityPage() {
     youtube: "",
     twitter: "",
   });
+
+  /* ---------------- INPUT CHANGE ---------------- */
 
   const handleChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -35,39 +38,48 @@ export default function AddCommunityPage() {
     }));
   };
 
+  /* ---------------- SUBMIT ---------------- */
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
 
-    await new Promise((r) => setTimeout(r, 600));
+    try {
+      const res = await url.post("/api/community/create", {
+        name: form.name,
+        description: form.description,
+        websiteUrl: form.website,
+        youtubeUrl: form.youtube,
+        twitterUrl: form.twitter,
+      });
 
-    const newCommunity = {
-      id: crypto.randomUUID(),
-      ...form,
-    };
+      console.log("Created:", res.data);
 
-    const existing = JSON.parse(localStorage.getItem("communities") || "[]");
-
-    localStorage.setItem(
-      "communities",
-      JSON.stringify([...existing, newCommunity])
-    );
-
-    setTimeout(() => {
-      setLoading(false);
       router.push("/dashboard");
-    }, 1000);
+    } catch (err: any) {
+      console.error("Create community error:", err);
+
+      alert(
+        err?.response?.data?.message ||
+        "Failed to create community. Please login again."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
+
+  /* ---------------- UI ---------------- */
 
   return (
     <div className="bg-[#0B1120] min-h-screen flex items-center justify-center px-4 sm:px-6 py-14">
-
       <div className="w-full max-w-3xl relative">
+
         <div className="absolute inset-0 flex justify-center pointer-events-none">
           <div className="w-[450px] h-[450px] bg-gradient-to-br from-blue-600/30 to-purple-600/20 rounded-full" />
         </div>
 
         <div className="relative bg-[#111827] border border-gray-800 rounded-2xl p-6 sm:p-10 shadow-xl">
+
           <h1 className="text-xl sm:text-2xl font-semibold text-white mb-2">
             Add Community Details
           </h1>
@@ -78,8 +90,11 @@ export default function AddCommunityPage() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
 
+            {/* NAME */}
             <div>
-              <label className="block text-sm text-gray-400 mb-2">Community Name</label>
+              <label className="block text-sm text-gray-400 mb-2">
+                Community Name
+              </label>
               <input
                 required
                 name="name"
@@ -90,8 +105,11 @@ export default function AddCommunityPage() {
               />
             </div>
 
+            {/* DESCRIPTION */}
             <div>
-              <label className="block text-sm text-gray-400 mb-2">Description</label>
+              <label className="block text-sm text-gray-400 mb-2">
+                Description
+              </label>
               <textarea
                 required
                 rows={4}
@@ -103,8 +121,11 @@ export default function AddCommunityPage() {
               />
             </div>
 
+            {/* WEBSITE */}
             <div>
-              <label className="block text-sm text-gray-400 mb-2">Website URL</label>
+              <label className="block text-sm text-gray-400 mb-2">
+                Website URL
+              </label>
               <input
                 type="url"
                 name="website"
@@ -115,8 +136,11 @@ export default function AddCommunityPage() {
               />
             </div>
 
+            {/* SOCIAL */}
             <div>
-              <label className="block text-sm text-gray-400 mb-2">Social Presence</label>
+              <label className="block text-sm text-gray-400 mb-2">
+                Social Presence
+              </label>
 
               <input
                 type="url"
@@ -137,6 +161,7 @@ export default function AddCommunityPage() {
               />
             </div>
 
+            {/* BUTTONS */}
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
 
               <button
@@ -155,13 +180,13 @@ export default function AddCommunityPage() {
               </button>
 
             </div>
+
           </form>
         </div>
       </div>
     </div>
   );
 }
-
 
 
 

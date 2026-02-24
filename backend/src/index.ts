@@ -7,6 +7,7 @@ import { middleware as supertokensMiddleware,errorHandler as supertokensErrorHan
 import * as supertokensNode from "supertokens-node";
 import "./config/supertokens";
 import communityRoutes from "./routes/community.route";
+import themesRoutes from "./routes/themes.route";
 
 dotenv.config();
 
@@ -32,6 +33,7 @@ app.use(
 );
 
 app.use("/api/community", communityRoutes);
+app.use("/api/themes", themesRoutes);
 
 /* ---------------- SUPERTOKENS ---------------- */
 

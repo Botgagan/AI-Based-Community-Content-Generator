@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
-import type { SessionRequest } from "supertokens-node/framework/express";
-import { createCommunity, getUserCommunities, updateCommunity, deleteCommunity } from "../services/community.service";
+import SessionRequest from "supertokens-node/framework/express";
+import { createCommunity, getUserCommunities, updateCommunity, deleteCommunity } from "../services/community.service.js";
 import { randomUUID } from "crypto";
 
 export async function createCommunityController(req: Request & SessionRequest, res: Response) {
