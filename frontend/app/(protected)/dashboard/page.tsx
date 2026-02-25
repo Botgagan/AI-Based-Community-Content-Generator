@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter} from "next/navigation";
-
+import { useRouter } from "next/navigation";
+import { url } from "@/lib/axiosInstance";
 
 type Community = {
   id: string;
@@ -12,25 +12,52 @@ type Community = {
 
 export default function DashboardPage() {
   const router = useRouter();
-
-
   const [communities, setCommunities] = useState<Community[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  
+  /* ---------------- FETCH ---------------- */
+
+  const fetchCommunities = async () => {
+    try {
+      const res = await url.get("/api/community/list");
+      setCommunities(res.data.communities);
+    } catch (err: any) {
+      console.error(err);
+      if (err?.response?.status === 401) router.push("/auth");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    
-    // Load communities
-    const stored = JSON.parse(localStorage.getItem("communities") || "[]");
-    setCommunities(stored);
+    fetchCommunities();
   }, []);
 
- 
+  /* ---------------- DELETE ---------------- */
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Delete this community?")) return;
+
+    try {
+      await url.delete(`/api/community/${id}`);
+
+      // remove from UI instantly
+      setCommunities((prev) => prev.filter((c) => c.id !== id));
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete community");
+    }
+  };
+
+  /* ---------------- STATS ---------------- */
 
   const stats = [
     { label: "Total Communities", value: communities.length },
     { label: "AI Content Generated", value: "0" },
     { label: "Engagement Rate", value: "0%" },
   ];
+
+  /* ---------------- UI ---------------- */
 
   return (
     <div className="bg-[#0B1120] min-h-screen px-4 sm:px-6 py-10 md:py-12">
@@ -55,8 +82,14 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* EMPTY STATE */}
-        {communities.length === 0 ? (
+        {/* LOADING */}
+        {loading ? (
+          <div className="text-center text-gray-400 py-20">
+            Loading communities...
+          </div>
+        ) : communities.length === 0 ? (
+
+          /* EMPTY STATE */
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-12 md:p-20 text-center">
             <h2 className="text-lg md:text-xl text-white font-semibold mb-2">
               Start building your community
@@ -73,6 +106,7 @@ export default function DashboardPage() {
               Add Your First Community
             </button>
           </div>
+
         ) : (
           <>
             {/* STATS */}
@@ -95,20 +129,44 @@ export default function DashboardPage() {
               {communities.map((community) => (
                 <div
                   key={community.id}
-                  className="bg-[#111827] border border-gray-800 rounded-xl p-6"
+                  className="relative bg-[#111827] border border-gray-800 rounded-xl p-6"
                 >
+                  {/* ACTION ICONS */}
+                  <div className="absolute top-4 right-4 flex gap-3">
+
+                    {/* EDIT */}
+                    <button
+                      onClick={() => router.push(`/edit-community/${community.id}`)}
+                      className="text-gray-400 hover:text-yellow-400 transition"
+                      title="Edit"
+                    >
+                      ✏️
+                    </button>
+
+                    {/* DELETE */}
+                    <button
+                      onClick={() => handleDelete(community.id)}
+                      className="text-gray-400 hover:text-red-500 transition"
+                      title="Delete"
+                    >
+                      🗑️
+                    </button>
+
+                  </div>
+
+                  {/* NAME */}
                   <h2 className="text-white font-semibold text-lg">
                     {community.name}
                   </h2>
 
+                  {/* DESC */}
                   <p className="text-gray-400 text-sm mt-2">
                     {community.description}
                   </p>
 
+                  {/* ORIGINAL BUTTON — UNCHANGED */}
                   <button
-                    onClick={() =>
-                      router.push(`/community/${community.id}`)
-                    }
+                    onClick={() => router.push(`/community/${community.id}`)}
                     className="mt-5 w-full bg-blue-600 py-2 rounded-lg text-white"
                   >
                     Generate & View Posts

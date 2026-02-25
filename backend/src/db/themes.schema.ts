@@ -1,5 +1,5 @@
 import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
-import { communities } from "./community.schema.js";
+import { communities } from "./community.schema";
 
 export const themes = pgTable(
   "themes",

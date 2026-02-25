@@ -13,6 +13,15 @@ export async function getUserCommunities(userId: string) {
     .where(eq(communities.userId, userId));
 }
 
+export async function getCommunityById(id: string) {
+  const [community] = await db
+    .select()
+    .from(communities)
+    .where(eq(communities.id, id));
+
+  return community;
+}
+
 export async function updateCommunity(id: string, userId: string, data: any) {
   return await db
     .update(communities)

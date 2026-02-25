@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { url } from "@/lib/axiosInstance";
 
 /* ---------------- TYPES ---------------- */
 
@@ -37,62 +38,68 @@ export default function CommunityDetailPage() {
   const [activeTab, setActiveTab] = useState<"themes" | "posts">("themes");
   const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null);
 
-  const [showEditModal, setShowEditModal] = useState(false);// later we create a global modal and will remove this local modal and same for loading or loader,toast notification etc
+  const [showEditModal, setShowEditModal] = useState(false);
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editPrompt, setEditPrompt] = useState("");
 
-  const [showCustomForm, setShowCustomForm] = useState(false);// form for adding custom theme , later can be a modal or form only.
+  const [showCustomForm, setShowCustomForm] = useState(false);
   const [customTheme, setCustomTheme] = useState({ title: "", description: "" });
 
-  /* ---------------- LOAD DATA ---------------- */
+  /* ---------------- LOAD COMMUNITY + THEMES ---------------- */
 
   useEffect(() => {
-    const communities = JSON.parse(localStorage.getItem("communities") || "[]");
-    const found = communities.find((c: Community) => c.id === id);// c.id is community id and id is from url params, we are finding the community which matches the id from url and setting it to state, if not found we set it to null
-    setCommunity(found || null);// this found contains the single ccmmunity that we selected in dashboard page.
+    fetchCommunity();
+    fetchThemes();
 
-    setThemes(JSON.parse(localStorage.getItem(`themes_${id}`) || "[]"));
+    // posts still local for now
     setPosts(JSON.parse(localStorage.getItem(`posts_${id}`) || "[]"));
-  }, [id]);// this id is from url params, so whenever we change the url params this useEffect will run and load the data for that community, themes and posts are also loaded from local storage based on community id.
+  }, [id]);
 
-  /* ---------------- SAVE ---------------- */
-
-  useEffect(() => {
-    localStorage.setItem(`themes_${id}`, JSON.stringify(themes));// this id is from url params, so we are saving the themes for that particular community in local storage with key as themes_communityId and value as the themes array in string format, whenever themes state changes this useEffect will run and save the updated themes to local storage.
-  }, [themes, id]);
-
-  useEffect(() => {
-    localStorage.setItem(`posts_${id}`, JSON.stringify(posts));// this id is from url params, so we are saving the posts for that particular community in local storage with key as posts_communityId and value as the posts array in string format, whenever posts state changes this useEffect will run and save the updated posts to local storage.
-  }, [posts, id]);
-
-  /* ---------------- GENERATORS ---------------- */
-
-  const generateThemes = async () => {
-    await new Promise((r) => setTimeout(r, 800));
-
-    setThemes([// this arev dummy themes but later we will integrate with ai to generate themes based on community description or name or any other parameter, for now we are just adding some dummy themes to demonstrate the functionality.
-      {
-        id: crypto.randomUUID(),
-        title: "Awareness Campaign",
-        description: "Promote mission and values",
-      },
-      {
-        id: crypto.randomUUID(),
-        title: "Educational Content",
-        description: "Share knowledge & insights",
-      },
-      {
-        id: crypto.randomUUID(),
-        title: "Events Promotion",
-        description: "Boost engagement",
-      },
-    ]);
+  const fetchCommunity = async () => {
+    try {
+      const res = await url.get(`/api/community/${id}`);
+      setCommunity(res.data.community);
+    } catch (err) {
+      console.error("Failed to fetch community", err);
+    }
   };
 
-  const generatePosts = async (theme: Theme) => {// passing theme as parameter because we need to generate posts based on selected theme, later we can also pass other parameters like community description or name or any other parameter to generate more relevant posts.
+  const fetchThemes = async () => {
+    try {
+      const res = await url.get(`/api/themes/${id}`);
+      setThemes(res.data.themes || []);
+    } catch (err) {
+      console.error("Failed to load themes", err);
+    }
+  };
+
+  /* ---------------- SAVE POSTS LOCAL ---------------- */
+
+  useEffect(() => {
+    localStorage.setItem(`posts_${id}`, JSON.stringify(posts));
+  }, [posts, id]);
+
+  /* ---------------- GENERATE THEMES ---------------- */
+
+  const generateThemes = async () => {
+    try {
+      const res = await url.post("/api/themes/generate", {
+        communityId: id,
+      });
+
+      setThemes(res.data.themes);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to generate themes");
+    }
+  };
+
+  /* ---------------- GENERATE POSTS ---------------- */
+
+  const generatePosts = async (theme: Theme) => {
     await new Promise((r) => setTimeout(r, 600));
 
-    const newPosts: Post[] = [// these are dummy posts but later we will integrate with ai to generate posts based on theme title or description or any other parameter, for now we are just adding some dummy posts to demonstrate the functionality.
+    const newPosts: Post[] = [
       {
         id: crypto.randomUUID(),
         themeId: theme.id,
@@ -112,9 +119,20 @@ export default function CommunityDetailPage() {
     setPosts((prev) => [...newPosts, ...prev]);
   };
 
+  /* ---------------- DELETE THEME ---------------- */
+
+  const deleteTheme = async (themeId: string) => {
+    try {
+      await url.delete(`/api/themes/${themeId}`);
+      setThemes((prev) => prev.filter((t) => t.id !== themeId));
+    } catch {
+      alert("Delete failed");
+    }
+  };
+
   /* ---------------- POST ACTIONS ---------------- */
 
-  const deletePost = (postId: string) => {// postId is the id of the post that we want to delete, we are filtering out the post with the given id from the posts array and setting the updated array to state, this will remove the post from the UI and also from local storage because we have useEffect that saves the posts to local storage whenever posts state changes.
+  const deletePost = (postId: string) => {
     setPosts((post) => post.filter((p) => p.id !== postId));
   };
 
@@ -127,14 +145,14 @@ export default function CommunityDetailPage() {
   };
 
   const regeneratePost = async () => {
-    if (!editingPostId) return;// this editingPostId is the id of the post that we want to edit, if it is null then we return and do nothing, this can happen if user clicks on generate button without selecting any post or if there is some error in setting the editingPostId state, so we are just adding a safety check here.
+    if (!editingPostId) return;
 
     await new Promise((r) => setTimeout(r, 600));
 
     setPosts((post) =>
       post.map((p) =>
         p.id === editingPostId
-          ? { ...p, content: p.content + " → " + editPrompt }// in content field the ai generated content will come , our task is to take the existing content and take the edit prompt from user and send to ai and then generate new content.
+          ? { ...p, content: p.content + " → " + editPrompt }
           : p
       )
     );
@@ -146,20 +164,23 @@ export default function CommunityDetailPage() {
 
   /* ---------------- CUSTOM THEME ---------------- */
 
-  const addCustomTheme = () => {
-    if (!customTheme.title.trim()) return;// this is a safety check to ensure that the title of the custom theme is not empty, if it is empty then we return and do nothing, this will prevent adding themes with empty titles to the themes array and also to local storage.
+  const addCustomTheme = async () => {
+    if (!customTheme.title.trim()) return;
 
-    setThemes((theme) => [
-      ...theme,
-      {
-        id: crypto.randomUUID(),
+    try {
+      const res = await url.post("/api/themes/custom", {
+        communityId: id,
         title: customTheme.title,
-        description: customTheme.description || "Custom theme",
-      },
-    ]);
+        description: customTheme.description,
+      });
 
-    setCustomTheme({ title: "", description: "" });
-    setShowCustomForm(false);
+      setThemes((prev) => [...prev, res.data.theme]);
+
+      setCustomTheme({ title: "", description: "" });
+      setShowCustomForm(false);
+    } catch {
+      alert("Failed to create theme");
+    }
   };
 
   /* ---------------- SAFETY ---------------- */
@@ -167,7 +188,7 @@ export default function CommunityDetailPage() {
   if (!community)
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0B1120] text-white">
-        Community not found
+        Loading community...
       </div>
     );
 
@@ -186,7 +207,7 @@ export default function CommunityDetailPage() {
 
         {/* TABS */}
         <div className="border-b border-gray-800 flex gap-6 mb-8">
-          {["themes", "posts"].map((tab) => (// we have two tabs themes and posts, we are mapping through them to create the tab buttons, when user clicks on a tab button we set the activeTab state to that tab, and we also add some styling to indicate which tab is active, if the activeTab is equal to the current tab then we add a blue color and border at the bottom, otherwise we add a gray color to indicate that it is not active.
+          {["themes", "posts"].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab as any)}
@@ -202,7 +223,7 @@ export default function CommunityDetailPage() {
         </div>
 
         {/* THEMES TAB */}
-        {activeTab === "themes" && (// if the active tab is themes then we show the themes related content, if active tab is posts then we show the posts related content, this is a simple conditional rendering based on the activeTab state.
+        {activeTab === "themes" && (
           <>
             {selectedTheme ? (
               <div>
@@ -225,7 +246,6 @@ export default function CommunityDetailPage() {
                   Generate Posts
                 </button>
 
-                {/* POSTS OF THEME */}
                 <div className="grid md:grid-cols-2 gap-6">
                   {posts
                     .filter((post) => post.themeId === selectedTheme.id)
@@ -345,12 +365,21 @@ export default function CommunityDetailPage() {
                       </p>
                     </div>
 
-                    <button
-                      onClick={() => setSelectedTheme(theme)}
-                      className="bg-blue-600 px-4 py-2 rounded text-white text-sm"
-                    >
-                      View Posts
-                    </button>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setSelectedTheme(theme)}
+                        className="bg-blue-600 px-4 py-2 rounded text-white text-sm"
+                      >
+                        View Posts
+                      </button>
+
+                      <button
+                        onClick={() => deleteTheme(theme.id)}
+                        className="text-red-400 text-sm"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -377,8 +406,8 @@ export default function CommunityDetailPage() {
         )}
       </div>
 
-      {/* EDIT MODAL */}// this is the modal that will show when user clicks on edit button for a post, in this modal user can enter the edit prompt and when they click on generate button we will take the existing content of the post and the edit prompt and send it to ai to generate new content and then update the post with the new content, for now we are just appending the edit prompt to the existing content to demonstrate the functionality.
-      {showEditModal && (// we can replace this modal trhough a global modal later.
+      {/* EDIT MODAL */}
+      {showEditModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4">
           <div className="bg-[#111827] w-full max-w-lg rounded-xl p-6 space-y-4 border border-gray-700">
             <h3 className="text-white text-lg font-semibold">

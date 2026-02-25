@@ -5,8 +5,9 @@ import ThirdParty from "supertokens-node/recipe/thirdparty";
 import Passwordless from "supertokens-node/recipe/passwordless";
 import dotenv from "dotenv";
 
-import { sendEmailOTP } from "../services/emailService";
-import { sendSMSOTP } from "../services/smsService";
+import { saveUserToDB } from "../services/user.service.js";
+import { sendEmailOTP } from "../services/emailService.js";
+import { sendSMSOTP } from "../services/smsService.js";
 
 dotenv.config();
 
@@ -19,11 +20,13 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   providers.push({
     config: {
       thirdPartyId: "google",
-      clients: [{
-        clientId: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET
-      }]
-    }
+      clients: [
+        {
+          clientId: process.env.GOOGLE_CLIENT_ID,
+          clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        },
+      ],
+    },
   });
 }
 
@@ -32,11 +35,13 @@ if (process.env.FB_CLIENT_ID && process.env.FB_CLIENT_SECRET) {
   providers.push({
     config: {
       thirdPartyId: "facebook",
-      clients: [{
-        clientId: process.env.FB_CLIENT_ID,
-        clientSecret: process.env.FB_CLIENT_SECRET
-      }]
-    }
+      clients: [
+        {
+          clientId: process.env.FB_CLIENT_ID,
+          clientSecret: process.env.FB_CLIENT_SECRET,
+        },
+      ],
+    },
   });
 }
 
@@ -50,41 +55,74 @@ if (
   providers.push({
     config: {
       thirdPartyId: "apple",
-      clients: [{
-        clientId: process.env.APPLE_CLIENT_ID,
-        additionalConfig: {
-          keyId: process.env.APPLE_KEY_ID,
-          privateKey: process.env.APPLE_PRIVATE_KEY,
-          teamId: process.env.APPLE_TEAM_ID,
-        }
-      }]
-    }
+      clients: [
+        {
+          clientId: process.env.APPLE_CLIENT_ID,
+          additionalConfig: {
+            keyId: process.env.APPLE_KEY_ID,
+            privateKey: process.env.APPLE_PRIVATE_KEY,
+            teamId: process.env.APPLE_TEAM_ID,
+          },
+        },
+      ],
+    },
   });
 }
+
+/* ---------- THIRD PARTY RECIPE ---------- */
 
 const thirdPartyRecipe =
   providers.length > 0
     ? ThirdParty.init({
-        signInAndUpFeature: { providers }
-      })
+      signInAndUpFeature: {
+        providers,
+      },
+
+      accountLinking: {
+        shouldDoAutomaticAccountLinking: async (newUser, userContext) => {
+          return {
+            shouldAutomaticallyLink: true,
+            shouldRequireVerification: false,
+          };
+        },
+      },
+
+      override: {
+        functions: (original) => ({
+          ...original,
+
+          async signInUp(input) {
+            const response = await original.signInUp(input);
+
+            if (response.status === "OK") {
+              const user = response.user;
+
+              await saveUserToDB({
+                id: user.id,
+                email: user.emails?.[0],
+              });
+            }
+
+            return response;
+          },
+        }),
+      },
+    })
     : null;
 
-/* ---------------- PASSWORDLESS ---------------- */
+/* ---------------- SMS DELIVERY ---------------- */
 
 const smsService = process.env.MSG91_AUTH_KEY
   ? {
-      service: {
-        sendSms: async (input: any) => {
-          await sendSMSOTP(
-            input.phoneNumber,
-            input.userInputCode
-          );
-        },
+    service: {
+      sendSms: async (input: any) => {
+        await sendSMSOTP(input.phoneNumber, input.userInputCode);
       },
-    }
+    },
+  }
   : undefined;
 
-/* ---------------- INIT ---------------- */
+/* ---------------- INIT SUPERTOKENS ---------------- */
 
 SuperTokens.init({
   framework: "express",
@@ -111,13 +149,43 @@ SuperTokens.init({
       flowType: "USER_INPUT_CODE_AND_MAGIC_LINK",
       contactMethod: "EMAIL_OR_PHONE",
 
+      accountLinking: {
+        shouldDoAutomaticAccountLinking: async () => ({
+          shouldAutomaticallyLink: true,
+          shouldRequireVerification: false,
+        }),
+      },
+
+      override: {
+        functions: (original) => ({
+          ...original,
+
+          async consumeCode(input) {
+            const response = await original.consumeCode(input);
+
+            if (response.status === "OK") {
+              const user = response.user;
+
+              try {
+                await saveUserToDB({
+                  id: user.id,
+                  email: user.emails?.[0],
+                  phone: user.phoneNumbers?.[0],
+                });
+              } catch (err) {
+                console.error("User DB save failed:", err);
+              }
+            }
+
+            return response;
+          },
+        }),
+      },
+
       emailDelivery: {
         service: {
           sendEmail: async (input) => {
-            await sendEmailOTP(
-              input.email,
-              input.userInputCode
-            );
+            await sendEmailOTP(input.email, input.userInputCode);
           },
         },
       },

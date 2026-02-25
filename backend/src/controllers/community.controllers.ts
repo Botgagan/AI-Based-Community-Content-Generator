@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import SessionRequest from "supertokens-node/framework/express";
-import { createCommunity, getUserCommunities, updateCommunity, deleteCommunity } from "../services/community.service.js";
+import { createCommunity, getUserCommunities, getCommunityById,updateCommunity, deleteCommunity } from "../services/community.service.js";
 import { randomUUID } from "crypto";
 
 export async function createCommunityController(req: Request & SessionRequest, res: Response) {
@@ -84,6 +84,23 @@ export async function deleteCommunityController(req: Request & SessionRequest, r
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Delete failed" });
+  }
+}
+
+export async function getCommunityByIdController(req, res) {
+  try {
+    const { id } = req.params;
+
+    const community = await getCommunityById(id);
+
+    if (!community) {
+      return res.status(404).json({ message: "Community not found" });
+    }
+
+    res.json({ community });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch community" });
   }
 }
 
