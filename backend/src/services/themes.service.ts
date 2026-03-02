@@ -1,31 +1,32 @@
 import { db } from "../index.js";
 import { themes } from "../db/themes.schema";
 import { communities } from "../db/community.schema";
+import { communityMembers } from "../db/communityMembers.schema";
 import { eq, and } from "drizzle-orm";
 
 /* =========================================================
-   HELPER → VERIFY COMMUNITY OWNERSHIP
+   VERIFY COMMUNITY MEMBERSHIP
 ========================================================= */
 
-async function verifyCommunityOwnership(
+async function verifyCommunityMembership(
   communityId: string,
   userId: string
 ) {
-  const community = await db
+  const membership = await db
     .select()
-    .from(communities)
+    .from(communityMembers)
     .where(
       and(
-        eq(communities.id, communityId),
-        eq(communities.userId, userId)
+        eq(communityMembers.communityId, communityId),
+        eq(communityMembers.userId, userId)
       )
     );
 
-  if (!community.length) {
-    throw new Error("Community not found or unauthorized");
+  if (!membership.length) {
+    throw new Error("Not authorized for this community");
   }
 
-  return community[0];
+  return membership[0];
 }
 
 /* =========================================================
@@ -36,9 +37,9 @@ export async function generateThemes(
   communityId: string,
   userId: string
 ) {
-  await verifyCommunityOwnership(communityId, userId);
+  await verifyCommunityMembership(communityId, userId);
 
-  const aiThemes = [//these are dummy themes. In real implementation, you would call an AI service to generate themes based on community info.
+  const aiThemes = [
     { title: "Awareness Campaign", description: "Promote mission and values" },
     { title: "Educational Content", description: "Share knowledge and insights" },
     { title: "Events Promotion", description: "Boost engagement" },
@@ -71,7 +72,7 @@ export async function createCustomTheme(
   },
   userId: string
 ) {
-  await verifyCommunityOwnership(data.communityId, userId);
+  await verifyCommunityMembership(data.communityId, userId);
 
   const [theme] = await db
     .insert(themes)
@@ -94,7 +95,7 @@ export async function getThemesByCommunity(
   communityId: string,
   userId: string
 ) {
-  await verifyCommunityOwnership(communityId, userId);
+  await verifyCommunityMembership(communityId, userId);
 
   return await db
     .select()
@@ -110,9 +111,10 @@ export async function deleteTheme(
   themeId: string,
   userId: string
 ) {
-  /* verify theme belongs to user's community */
-
-  const theme = await db.select().from(themes).where(eq(themes.id, themeId));
+  const theme = await db
+    .select()
+    .from(themes)
+    .where(eq(themes.id, themeId));
 
   if (!theme.length) {
     throw new Error("Theme not found");
@@ -120,7 +122,12 @@ export async function deleteTheme(
 
   const communityId = theme[0].communityId;
 
-  await verifyCommunityOwnership(communityId, userId);
+  const membership = await verifyCommunityMembership(communityId, userId);
+
+  // Only owner can delete theme (optional rule)
+  if (membership.role !== "owner") {
+    throw new Error("Only owner can delete themes");
+  }
 
   await db.delete(themes).where(eq(themes.id, themeId));
 

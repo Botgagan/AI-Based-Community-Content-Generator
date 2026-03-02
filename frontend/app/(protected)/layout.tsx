@@ -3,6 +3,7 @@
 import { SessionAuth } from "supertokens-auth-react/recipe/session";
 import NavbarComponent from "@/components/Navbar";
 import FooterComponent from "@/components/Footer";
+import Sidebar from "@/components/Sidebar";
 
 export default function ProtectedLayout({
   children,
@@ -10,11 +11,25 @@ export default function ProtectedLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SessionAuth requireAuth={true}>
-      <div className="flex flex-col min-h-screen">
+    <SessionAuth requireAuth>
+      <div className="min-h-screen flex flex-col bg-[#0B1120]">
+
         <NavbarComponent />
-        <main className="flex-grow">{children}</main>
+
+        <div className="flex flex-1">
+
+          {/* Sidebar */}
+          <Sidebar />
+
+          {/* Page Content */}
+          <main className="flex-1 p-6 overflow-y-auto">
+            {children}
+          </main>
+
+        </div>
+
         <FooterComponent />
+
       </div>
     </SessionAuth>
   );

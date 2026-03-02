@@ -35,7 +35,7 @@ export default function CommunityDetailPage() {
   const [themes, setThemes] = useState<Theme[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
 
-  const [activeTab, setActiveTab] = useState<"themes" | "posts">("themes");
+  const [activeTab, setActiveTab] = useState<"themes" | "posts">("posts");
   const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null);
 
   const [showEditModal, setShowEditModal] = useState(false);
@@ -45,13 +45,16 @@ export default function CommunityDetailPage() {
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [customTheme, setCustomTheme] = useState({ title: "", description: "" });
 
+  /* 🔥 NEW */
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteLoading, setInviteLoading] = useState(false);
+
   /* ---------------- LOAD COMMUNITY + THEMES ---------------- */
 
   useEffect(() => {
     fetchCommunity();
     fetchThemes();
-
-    // posts still local for now
     setPosts(JSON.parse(localStorage.getItem(`posts_${id}`) || "[]"));
   }, [id]);
 
@@ -86,7 +89,6 @@ export default function CommunityDetailPage() {
       const res = await url.post("/api/themes/generate", {
         communityId: id,
       });
-
       setThemes(res.data.themes);
     } catch (err) {
       console.error(err);
@@ -127,6 +129,29 @@ export default function CommunityDetailPage() {
       setThemes((prev) => prev.filter((t) => t.id !== themeId));
     } catch {
       alert("Delete failed");
+    }
+  };
+
+  /* ---------------- INVITE USER ---------------- */
+
+  const sendInvite = async () => {
+    if (!inviteEmail.trim()) return;
+
+    try {
+      setInviteLoading(true);
+
+      await url.post("/api/invite/send", {
+        communityId: id,
+        email: inviteEmail,
+      });
+
+      setInviteEmail("");
+      setShowInvite(false);
+      alert("Invite sent!");
+    } catch {
+      alert("Invite failed");
+    } finally {
+      setInviteLoading(false);
     }
   };
 
@@ -200,14 +225,24 @@ export default function CommunityDetailPage() {
       <div className="max-w-6xl mx-auto">
 
         {/* HEADER */}
-        <div className="bg-[#111827] border border-gray-800 rounded-xl p-6 mb-8">
-          <h1 className="text-xl text-white font-semibold">{community.name}</h1>
-          <p className="text-gray-400 mt-2 text-sm">{community.description}</p>
+        <div className="bg-[#111827] border border-gray-800 rounded-xl p-6 mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-xl text-white font-semibold">{community.name}</h1>
+            <p className="text-gray-400 mt-2 text-sm">{community.description}</p>
+          </div>
+
+          {/* 🔥 INVITE BUTTON */}
+          <button
+            onClick={() => setShowInvite(true)}
+            className="bg-green-600 px-5 py-2 rounded text-white"
+          >
+            Invite
+          </button>
         </div>
 
         {/* TABS */}
         <div className="border-b border-gray-800 flex gap-6 mb-8">
-          {["themes", "posts"].map((tab) => (
+          {["posts", "themes"].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab as any)}
@@ -386,54 +421,36 @@ export default function CommunityDetailPage() {
             )}
           </>
         )}
-
-        {/* POSTS TAB */}
-        {activeTab === "posts" && (
-          <div className="grid md:grid-cols-2 gap-6">
-            {posts.map((post) => (
-              <div
-                key={post.id}
-                className="bg-[#111827] border border-gray-800 rounded-xl p-5 space-y-3"
-              >
-                <span className="text-xs text-blue-400">
-                  {post.themeTitle}
-                </span>
-                <h3 className="text-white font-semibold">{post.title}</h3>
-                <p className="text-gray-400 text-sm">{post.content}</p>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
-      {/* EDIT MODAL */}
-      {showEditModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4">
-          <div className="bg-[#111827] w-full max-w-lg rounded-xl p-6 space-y-4 border border-gray-700">
-            <h3 className="text-white text-lg font-semibold">
-              Edit Post with AI
-            </h3>
+      {/* INVITE MODAL */}
+      {showInvite && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center">
+          <div className="bg-[#111827] p-8 rounded-xl w-96">
+            <h2 className="text-lg mb-4">Invite Member</h2>
 
-            <textarea
-              placeholder="Describe changes..."
-              value={editPrompt}
-              onChange={(e) => setEditPrompt(e.target.value)}
-              className="w-full bg-[#020617] border border-gray-700 rounded-lg p-3 text-white"
+            <input
+              type="email"
+              placeholder="Enter email"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              className="w-full p-2 rounded text-black mb-4"
             />
 
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => setShowEditModal(false)}
-                className="px-4 py-2 bg-gray-700 rounded text-white"
+                onClick={() => setShowInvite(false)}
+                className="px-4 py-2 bg-gray-600 rounded"
               >
                 Cancel
               </button>
 
               <button
-                onClick={regeneratePost}
-                className="px-5 py-2 bg-blue-600 rounded text-white"
+                onClick={sendInvite}
+                disabled={inviteLoading}
+                className="px-4 py-2 bg-green-600 rounded"
               >
-                Generate
+                {inviteLoading ? "Sending..." : "Send Invite"}
               </button>
             </div>
           </div>

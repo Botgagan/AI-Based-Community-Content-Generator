@@ -15,7 +15,6 @@ dotenv.config();
 
 const providers: any[] = [];
 
-/* GOOGLE */
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   providers.push({
     config: {
@@ -30,7 +29,6 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   });
 }
 
-/* FACEBOOK */
 if (process.env.FB_CLIENT_ID && process.env.FB_CLIENT_SECRET) {
   providers.push({
     config: {
@@ -45,7 +43,6 @@ if (process.env.FB_CLIENT_ID && process.env.FB_CLIENT_SECRET) {
   });
 }
 
-/* APPLE */
 if (
   process.env.APPLE_CLIENT_ID &&
   process.env.APPLE_KEY_ID &&
@@ -74,52 +71,53 @@ if (
 const thirdPartyRecipe =
   providers.length > 0
     ? ThirdParty.init({
-      signInAndUpFeature: {
-        providers,
-      },
+        signInAndUpFeature: { providers },
 
-      accountLinking: {
-        shouldDoAutomaticAccountLinking: async (newUser, userContext) => {
-          return {
+        accountLinking: {
+          shouldDoAutomaticAccountLinking: async () => ({
             shouldAutomaticallyLink: true,
             shouldRequireVerification: false,
-          };
+          }),
         },
-      },
 
-      override: {
-        functions: (original) => ({
-          ...original,
+        override: {
+          functions: (original) => ({
+            ...original,
 
-          async signInUp(input) {
-            const response = await original.signInUp(input);
+            async signInUp(input) {
+              const response = await original.signInUp(input);
 
-            if (response.status === "OK") {
-              const user = response.user;
+              if (response.status === "OK") {
+                const user = response.user;
 
-              await saveUserToDB({
-                id: user.id,
-                email: user.emails?.[0],
-              });
-            }
+                /* 🔥 THIS IS THE FIX */
+                const primaryUserId =
+                  user.loginMethods?.[0]?.recipeUserId?.getAsString()
+                  user.id;
 
-            return response;
-          },
-        }),
-      },
-    })
+                await saveUserToDB({
+                  id: primaryUserId,
+                  email: user.emails?.[0],
+                });
+              }
+
+              return response;
+            },
+          }),
+        },
+      })
     : null;
 
 /* ---------------- SMS DELIVERY ---------------- */
 
 const smsService = process.env.MSG91_AUTH_KEY
   ? {
-    service: {
-      sendSms: async (input: any) => {
-        await sendSMSOTP(input.phoneNumber, input.userInputCode);
+      service: {
+        sendSms: async (input: any) => {
+          await sendSMSOTP(input.phoneNumber, input.userInputCode);
+        },
       },
-    },
-  }
+    }
   : undefined;
 
 /* ---------------- INIT SUPERTOKENS ---------------- */
@@ -166,15 +164,16 @@ SuperTokens.init({
             if (response.status === "OK") {
               const user = response.user;
 
-              try {
-                await saveUserToDB({
-                  id: user.id,
-                  email: user.emails?.[0],
-                  phone: user.phoneNumbers?.[0],
-                });
-              } catch (err) {
-                console.error("User DB save failed:", err);
-              }
+              /* 🔥 SAME FIX HERE */
+              const primaryUserId =
+                user.loginMethods?.[0]?.recipeUserId?.getAsString()
+                user.id;
+
+              await saveUserToDB({
+                id: primaryUserId,
+                email: user.emails?.[0],
+                phone: user.phoneNumbers?.[0],
+              });
             }
 
             return response;

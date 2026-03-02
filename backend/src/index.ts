@@ -8,6 +8,7 @@ import * as supertokensNode from "supertokens-node";
 import "./config/supertokens";
 import communityRoutes from "./routes/community.route";
 import themesRoutes from "./routes/themes.route";
+import inviteRoutes from "./routes/invite.route";
 
 dotenv.config();
 
@@ -34,6 +35,7 @@ app.use(
 
 app.use("/api/community", communityRoutes);
 app.use("/api/themes", themesRoutes);
+app.use("/api/invite", inviteRoutes);
 
 /* ---------------- SUPERTOKENS ---------------- */
 
