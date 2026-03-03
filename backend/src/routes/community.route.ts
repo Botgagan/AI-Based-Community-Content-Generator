@@ -1,15 +1,25 @@
 import { Router } from "express";
-import { verifySession } from "../middleware/auth";
-import { createCommunityController,getCommunitiesController, updateCommunityController, deleteCommunityController, getCommunityByIdController, leaveCommunityController } from "../controllers/community.controllers";
+import { verifySession } from "../middleware/auth.js";
+
+import {
+  createCommunityController,
+  getCommunitiesController,
+  updateCommunityController,
+  deleteCommunityController,
+  getCommunityByIdController,
+  leaveCommunityController,
+} from "../controllers/community.controllers.js";
 
 const router = Router();
 
-router.post("/create", verifySession(), createCommunityController);
-router.get("/list", verifySession(), getCommunitiesController);
-router.get("/:id", verifySession(), getCommunityByIdController);
-router.put("/:id", verifySession(), updateCommunityController);//this id is uuid in communities table that will be fetched using useparams and then details will be shown on frontend using mapping.
-router.delete("/:id", verifySession(), deleteCommunityController);
-router.post("/:id/leave", verifySession(), leaveCommunityController);
+router.use(verifySession());
+
+router.post("/create", createCommunityController);
+router.get("/list", getCommunitiesController);
+router.get("/:id", getCommunityByIdController);
+router.put("/:id", updateCommunityController);
+router.delete("/:id", deleteCommunityController);
+router.delete("/:id/leave", leaveCommunityController);
 
 export default router;
 

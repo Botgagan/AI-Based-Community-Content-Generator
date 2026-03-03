@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { url } from "@/lib/axiosInstance";
 import Session from "supertokens-auth-react/recipe/session";
@@ -11,36 +11,41 @@ export default function InvitePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const handleInvite = async () => {
-      try {
-        // Validate invite first
-        await url.get(`/api/invite/validate/${token}`);
+    if (!token) return;
 
+    const processInvite = async () => {
+      try {
+        // Step 1: Validate invite
+        await url.get(`/api/invite/validate/${token}`);// /api/invite is a base route defined in the backend, and /validate/:token is the endpoint to validate the invite token. This step ensures that the token is valid before proceeding.
+
+        // Step 2: Check session
         const hasSession = await Session.doesSessionExist();
 
         if (!hasSession) {
-          // redirect to auth with return path
-          router.push(`/auth?redirectTo=/invite/${token}`);
+          // Force login
+          router.replace(`/auth?redirectTo=/invite/${token}`);//
           return;
         }
 
-        // Accept invite
+        // Step 3: Accept invite
         const res = await url.post(`/api/invite/accept/${token}`);
-        router.push(`/community/${res.data.communityId}`);
+
+        // Step 4: Redirect to community
+        router.replace(`/community/${res.data.communityId}`);
       } catch (err: any) {
         alert(err.response?.data?.message || "Invalid invite");
-        router.push("/");
+        router.replace("/");
       } finally {
         setLoading(false);
       }
     };
 
-    handleInvite();
-  }, []);
+    processInvite();
+  }, [token]);
 
   return (
-    <div className="text-white p-10">
-      {loading ? "Processing invite..." : ""}
+    <div className="min-h-screen flex items-center justify-center text-white">
+      {loading ? "Processing invite..." : null}
     </div>
   );
 }

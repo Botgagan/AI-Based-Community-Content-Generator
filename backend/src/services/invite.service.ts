@@ -8,59 +8,26 @@ import { randomUUID } from "crypto";
 import { sendInviteEmail } from "../services/emailInvite.service";
 
 /* ================= SEND INVITE ================= */
-
 export async function sendInvite(
   communityId: string,
   email: string,
-  senderUserId: string
+  inviterId: string
 ) {
-  if (!communityId || !email)
-    throw new Error("Missing fields");
-
   const token = crypto.randomBytes(32).toString("hex");
 
-  /* 1️⃣ CHECK IF EMAIL BELONGS TO EXISTING USER */
-
-  const existingUser = await db
+  /* verify inviter is member */
+  const inviter = await db
     .select()
-    .from(users)
-    .where(eq(users.email, email));
-
-  /* 2️⃣ IF USER EXISTS → CHECK MEMBERSHIP */
-
-  if (existingUser.length) {
-    const member = await db
-      .select()
-      .from(communityMembers)
-      .where(
-        and(
-          eq(communityMembers.communityId, communityId),
-          eq(communityMembers.userId, existingUser[0].id)
-        )
-      );
-
-    if (member.length) {
-      throw new Error("User already in community");
-    }
-  }
-
-  /* 3️⃣ CHECK IF INVITE ALREADY SENT */
-
-  const alreadyInvited = await db
-    .select()
-    .from(invites)
+    .from(communityMembers)
     .where(
       and(
-        eq(invites.communityId, communityId),
-        eq(invites.email, email),
-        eq(invites.status, "pending")
+        eq(communityMembers.communityId, communityId),
+        eq(communityMembers.userId, inviterId)
       )
     );
 
-  if (alreadyInvited.length)
-    throw new Error("Invite already sent");
-
-  /* 4️⃣ CREATE INVITE */
+  if (!inviter.length)
+    throw new Error("Not authorized to invite");
 
   await db.insert(invites).values({
     id: randomUUID(),
@@ -69,8 +36,6 @@ export async function sendInvite(
     token,
     status: "pending",
   });
-
-  /* 5️⃣ SEND EMAIL */
 
   const inviteLink = `${process.env.FRONTEND_URL}/invite/${token}`;
 

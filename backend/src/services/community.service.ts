@@ -1,15 +1,12 @@
 import { db } from "../index.js";
-import { communities } from "../db/community.schema";
-import { communityMembers } from "../db/communityMembers.schema";
+import { communities } from "../db/community.schema.js";
+import { communityMembers } from "../db/communityMembers.schema.js";
 import { eq, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
-/* =========================================================
-   CREATE COMMUNITY
-========================================================= */
+/* CREATE COMMUNITY */
 
 export async function createCommunity(data: any, userId: string) {
-  /* create community */
   const [community] = await db
     .insert(communities)
     .values({
@@ -22,7 +19,7 @@ export async function createCommunity(data: any, userId: string) {
     })
     .returning();
 
-  /* IMPORTANT — add creator as OWNER */
+  // creator becomes owner
   await db.insert(communityMembers).values({
     id: randomUUID(),
     communityId: community.id,
@@ -33,11 +30,11 @@ export async function createCommunity(data: any, userId: string) {
   return community;
 }
 
-/* =========================================================
-   GET USER COMMUNITIES
-========================================================= */
+/* GET USER COMMUNITIES */
 
 export async function getUserCommunities(userId: string) {
+  if (!userId) return [];
+
   return await db
     .select({
       id: communities.id,
@@ -53,13 +50,19 @@ export async function getUserCommunities(userId: string) {
     .where(eq(communityMembers.userId, userId));
 }
 
-/* =========================================================
-   GET COMMUNITY BY ID
-========================================================= */
+/* GET COMMUNITY BY ID (ONLY IF MEMBER) */
 
 export async function getCommunityById(id: string, userId: string) {
   const result = await db
-    .select()
+    .select({
+      id: communities.id,
+      name: communities.name,
+      description: communities.description,
+      websiteUrl: communities.websiteUrl,
+      youtubeUrl: communities.youtubeUrl,
+      twitterUrl: communities.twitterUrl,
+      createdAt: communities.createdAt,
+    })
     .from(communityMembers)
     .innerJoin(
       communities,
@@ -72,12 +75,10 @@ export async function getCommunityById(id: string, userId: string) {
       )
     );
 
-  return result[0]?.communities ?? null;
+  return result[0] || null;
 }
 
-/* =========================================================
-   UPDATE (OWNER ONLY)
-========================================================= */
+/* UPDATE (OWNER ONLY) */
 
 export async function updateCommunity(id: string, userId: string, data: any) {
   const member = await db
@@ -93,16 +94,14 @@ export async function updateCommunity(id: string, userId: string, data: any) {
   if (!member.length || member[0].role !== "owner")
     throw new Error("Only owner can update");
 
-  return await db
+  return db
     .update(communities)
     .set(data)
     .where(eq(communities.id, id))
     .returning();
 }
 
-/* =========================================================
-   DELETE (OWNER ONLY)
-========================================================= */
+/* DELETE (OWNER ONLY) */
 
 export async function deleteCommunity(id: string, userId: string) {
   const member = await db
@@ -118,20 +117,12 @@ export async function deleteCommunity(id: string, userId: string) {
   if (!member.length || member[0].role !== "owner")
     throw new Error("Only owner can delete");
 
-  return await db
-    .delete(communities)
-    .where(eq(communities.id, id))
-    .returning();
+  return db.delete(communities).where(eq(communities.id, id)).returning();
 }
 
-/* =========================================================
-   LEAVE COMMUNITY
-========================================================= */
+/* LEAVE COMMUNITY */
 
-export async function leaveCommunity(
-  communityId: string,
-  userId: string
-) {
+export async function leaveCommunity(communityId: string, userId: string) {
   const member = await db
     .select()
     .from(communityMembers)
@@ -143,10 +134,11 @@ export async function leaveCommunity(
     );
 
   if (!member.length) throw new Error("Not a member");
+
   if (member[0].role === "owner")
     throw new Error("Owner cannot leave");
 
-  return await db
+  return db
     .delete(communityMembers)
     .where(
       and(

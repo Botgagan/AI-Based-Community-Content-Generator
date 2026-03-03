@@ -57,10 +57,7 @@ export async function getCommunitiesController(
 }
 
 /* GET BY ID */
-export async function getCommunityByIdController(
-  req: Request & SessionRequest,
-  res: Response
-) {
+export async function getCommunityByIdController(req: Request & SessionRequest, res: Response) {
   try {
     const userId = await getPrimaryUserId(req);
     const { id } = req.params;
@@ -68,7 +65,9 @@ export async function getCommunityByIdController(
     const community = await getCommunityById(id, userId);
 
     if (!community)
-      return res.status(404).json({ message: "Community not found" });
+      return res.status(403).json({
+        message: "You are not member of this community",
+      });
 
     res.json({ success: true, community });
   } catch (err: any) {

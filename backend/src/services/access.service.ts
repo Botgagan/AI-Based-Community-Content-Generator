@@ -1,6 +1,8 @@
 import { db } from "../index.js";
-import { communityMembers } from "../db/communityMembers.schema.js";
-import { eq, and } from "drizzle-orm";
+import { communityMembers } from "../db/communityMembers.schema";
+import { and, eq } from "drizzle-orm";
+
+/* CHECK MEMBER ACCESS */
 
 export async function checkCommunityAccess(
   communityId: string,
@@ -16,9 +18,22 @@ export async function checkCommunityAccess(
       )
     );
 
-  if (!member.length) {
-    throw new Error("Access denied");
-  }
+  if (!member.length)
+    throw new Error("Not authorized for this community");
 
   return member[0];
+}
+
+/* CHECK OWNER */
+
+export async function requireOwner(
+  communityId: string,
+  userId: string
+) {
+  const member = await checkCommunityAccess(communityId, userId);
+
+  if (member.role !== "owner")
+    throw new Error("Only owner allowed");
+
+  return member;
 }

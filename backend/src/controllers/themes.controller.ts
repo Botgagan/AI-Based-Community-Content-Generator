@@ -8,6 +8,8 @@ import {
   deleteTheme,
 } from "../services/themes.service.js";
 
+import { getPrimaryUserId } from "../utils/getPrimaryUserId.js";
+
 /* =======================================================
    GENERATE THEMES
 ======================================================= */
@@ -17,8 +19,12 @@ export async function generateThemesController(
   res: Response
 ) {
   try {
-    const userId = req.session!.getUserId();
+    const userId = await getPrimaryUserId(req);
     const { communityId } = req.body;
+
+    if (!communityId) {
+      return res.status(400).json({ message: "communityId required" });
+    }
 
     const themes = await generateThemes(communityId, userId);
 
@@ -27,8 +33,8 @@ export async function generateThemesController(
       themes,
     });
   } catch (err: any) {
-    console.error(err);
-    res.status(500).json({ message: err.message });
+    console.error("generate themes error:", err);
+    res.status(403).json({ message: err.message });
   }
 }
 
@@ -41,8 +47,12 @@ export async function createCustomThemeController(
   res: Response
 ) {
   try {
-    const userId = req.session!.getUserId();
+    const userId = await getPrimaryUserId(req);
     const { communityId, title, description } = req.body;
+
+    if (!communityId || !title) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
 
     const theme = await createCustomTheme(
       { communityId, title, description },
@@ -54,8 +64,8 @@ export async function createCustomThemeController(
       theme,
     });
   } catch (err: any) {
-    console.error(err);
-    res.status(500).json({ message: err.message });
+    console.error("create theme error:", err);
+    res.status(403).json({ message: err.message });
   }
 }
 
@@ -68,15 +78,19 @@ export async function getThemesController(
   res: Response
 ) {
   try {
-    const userId = req.session!.getUserId();
+    const userId = await getPrimaryUserId(req);
     const { communityId } = req.params;
+
+    if (!communityId) {
+      return res.status(400).json({ message: "communityId required" });
+    }
 
     const themes = await getThemesByCommunity(communityId, userId);
 
     res.json({ success: true, themes });
   } catch (err: any) {
-    console.error(err);
-    res.status(500).json({ message: err.message });
+    console.error("get themes error:", err);
+    res.status(403).json({ message: err.message });
   }
 }
 
@@ -89,14 +103,18 @@ export async function deleteThemeController(
   res: Response
 ) {
   try {
-    const userId = req.session!.getUserId();
+    const userId = await getPrimaryUserId(req);
     const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({ message: "Theme id required" });
+    }
 
     await deleteTheme(id, userId);
 
     res.json({ success: true });
   } catch (err: any) {
-    console.error(err);
-    res.status(500).json({ message: err.message });
+    console.error("delete theme error:", err);
+    res.status(403).json({ message: err.message });
   }
 }

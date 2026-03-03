@@ -1,6 +1,5 @@
 import { db } from "../index.js";
 import { themes } from "../db/themes.schema";
-import { communities } from "../db/community.schema";
 import { communityMembers } from "../db/communityMembers.schema";
 import { eq, and } from "drizzle-orm";
 
@@ -12,7 +11,7 @@ async function verifyCommunityMembership(
   communityId: string,
   userId: string
 ) {
-  const membership = await db
+  const [membership] = await db
     .select()
     .from(communityMembers)
     .where(
@@ -22,11 +21,11 @@ async function verifyCommunityMembership(
       )
     );
 
-  if (!membership.length) {
+  if (!membership) {
     throw new Error("Not authorized for this community");
   }
 
-  return membership[0];
+  return membership;
 }
 
 /* =========================================================
@@ -45,10 +44,10 @@ export async function generateThemes(
     { title: "Events Promotion", description: "Boost engagement" },
   ];
 
-  const inserted = await db
+  return await db
     .insert(themes)
     .values(
-      aiThemes.map((t) => ({
+      aiThemes.map(t => ({
         communityId,
         title: t.title,
         description: t.description,
@@ -56,8 +55,6 @@ export async function generateThemes(
       }))
     )
     .returning();
-
-  return inserted;
 }
 
 /* =========================================================
@@ -97,7 +94,7 @@ export async function getThemesByCommunity(
 ) {
   await verifyCommunityMembership(communityId, userId);
 
-  return await db
+  return db
     .select()
     .from(themes)
     .where(eq(themes.communityId, communityId));
@@ -111,20 +108,21 @@ export async function deleteTheme(
   themeId: string,
   userId: string
 ) {
-  const theme = await db
+  const [theme] = await db
     .select()
     .from(themes)
     .where(eq(themes.id, themeId));
 
-  if (!theme.length) {
+  if (!theme) {
     throw new Error("Theme not found");
   }
 
-  const communityId = theme[0].communityId;
+  const membership = await verifyCommunityMembership(
+    theme.communityId,
+    userId
+  );
 
-  const membership = await verifyCommunityMembership(communityId, userId);
-
-  // Only owner can delete theme (optional rule)
+  // owner-only delete rule
   if (membership.role !== "owner") {
     throw new Error("Only owner can delete themes");
   }
