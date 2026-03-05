@@ -12,14 +12,12 @@ import {
 
 const router = Router();
 
-router.use(verifySession());
-
-router.post("/create", createCommunityController);
-router.get("/list", getCommunitiesController);
-router.get("/:id", getCommunityByIdController);
-router.put("/:id", updateCommunityController);
-router.delete("/:id", deleteCommunityController);
-router.delete("/:id/leave", leaveCommunityController);
+router.post("/create",verifySession(), createCommunityController);
+router.get("/list",verifySession(), getCommunitiesController);
+router.get("/:id", verifySession(), getCommunityByIdController);
+router.put("/:id", verifySession(), updateCommunityController);
+router.delete("/:id", verifySession(), deleteCommunityController);
+router.delete("/:id/leave", verifySession(), leaveCommunityController);
 
 export default router;
 

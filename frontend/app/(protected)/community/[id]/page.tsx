@@ -36,100 +36,128 @@ export default function CommunityDetailPage() {
   const [posts, setPosts] = useState<Post[]>([]);
 
   const [activeTab, setActiveTab] = useState<"themes" | "posts">("posts");
-  const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null);
 
-  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedThemeFilter, setSelectedThemeFilter] = useState("all");
+
+  const [showCustomForm, setShowCustomForm] = useState(false);
+  const [customTheme, setCustomTheme] = useState({
+    title: "",
+    description: "",
+  });
+
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editPrompt, setEditPrompt] = useState("");
 
-  const [showCustomForm, setShowCustomForm] = useState(false);
-  const [customTheme, setCustomTheme] = useState({ title: "", description: "" });
+  /* ---------------- INVITE STATES ---------------- */
 
-  /* 🔥 NEW */
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteLoading, setInviteLoading] = useState(false);
 
-  /* ---------------- LOAD COMMUNITY + THEMES ---------------- */
+  /* ---------------- LOAD DATA ---------------- */
 
   useEffect(() => {
     fetchCommunity();
     fetchThemes();
-    setPosts(JSON.parse(localStorage.getItem(`posts_${id}`) || "[]"));
+    fetchPosts();
   }, [id]);
 
   const fetchCommunity = async () => {
-    try {
-      const res = await url.get(`/api/community/${id}`);
-      setCommunity(res.data.community);
-    } catch (err) {
-      console.error("Failed to fetch community", err);
-    }
+    const res = await url.get(`/api/community/${id}`);
+    setCommunity(res.data.community);
   };
 
   const fetchThemes = async () => {
-    try {
-      const res = await url.get(`/api/themes/${id}`);
-      setThemes(res.data.themes || []);
-    } catch (err) {
-      console.error("Failed to load themes", err);
-    }
+    const res = await url.get(`/api/themes/${id}`);
+    setThemes(res.data.themes || []);
   };
 
-  /* ---------------- SAVE POSTS LOCAL ---------------- */
-
-  useEffect(() => {
-    localStorage.setItem(`posts_${id}`, JSON.stringify(posts));
-  }, [posts, id]);
+  const fetchPosts = async (themeId?: string) => {
+    const query = themeId ? `?themeId=${themeId}` : `?communityId=${id}`;
+    const res = await url.get(`/api/posts${query}`);
+    setPosts(res.data.posts || []);
+  };
 
   /* ---------------- GENERATE THEMES ---------------- */
 
   const generateThemes = async () => {
-    try {
-      const res = await url.post("/api/themes/generate", {
-        communityId: id,
-      });
-      setThemes(res.data.themes);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to generate themes");
-    }
+    const res = await url.post("/api/themes/generate", {
+      communityId: id,
+    });
+
+    setThemes(res.data.themes);
+  };
+
+  /* ---------------- ADD CUSTOM THEME ---------------- */
+
+  const addCustomTheme = async () => {
+    if (!customTheme.title.trim()) return;
+
+    const res = await url.post("/api/themes/custom", {
+      communityId: id,
+      title: customTheme.title,
+      description: customTheme.description,
+    });
+
+    setThemes((prev) => [res.data.theme,...prev]);
+
+    setCustomTheme({ title: "", description: "" });
+    setShowCustomForm(false);
   };
 
   /* ---------------- GENERATE POSTS ---------------- */
 
   const generatePosts = async (theme: Theme) => {
-    await new Promise((r) => setTimeout(r, 600));
-
-    const newPosts: Post[] = [
+    const dummyPosts = [
       {
-        id: crypto.randomUUID(),
-        themeId: theme.id,
-        themeTitle: theme.title,
-        title: `${theme.title} Idea`,
-        content: `Discover the power of ${theme.title}. Join today.`,
+        title: `${theme.title} Awareness`,
+        content: `Learn how ${theme.title} can transform communities.`,
       },
       {
-        id: crypto.randomUUID(),
-        themeId: theme.id,
-        themeTitle: theme.title,
-        title: `${theme.title} Awareness`,
-        content: `Learn how ${theme.title} can transform lives.`,
+        title: `${theme.title} Inspiration`,
+        content: `Be part of ${theme.title} and spread positivity.`,
       },
     ];
 
-    setPosts((prev) => [...newPosts, ...prev]);
+    for (const p of dummyPosts) {
+      await url.post("/api/posts/create", {
+        themeId: theme.id,
+        title: p.title,
+        content: p.content,
+      });
+    }
+
+    await fetchPosts();
+    setActiveTab("posts");
   };
 
-  /* ---------------- DELETE THEME ---------------- */
+  /* ---------------- DELETE POST ---------------- */
 
-  const deleteTheme = async (themeId: string) => {
-    try {
-      await url.delete(`/api/themes/${themeId}`);
-      setThemes((prev) => prev.filter((t) => t.id !== themeId));
-    } catch {
-      alert("Delete failed");
-    }
+  const deletePost = async (postId: string) => {
+    await url.delete(`/api/posts/${postId}`);
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+  };
+
+  /* ---------------- REGENERATE POST ---------------- */
+
+  const regeneratePost = async (postId: string) => {
+    await url.patch(`/api/posts/${postId}/regenerate`);
+    fetchPosts();
+  };
+
+  /* ---------------- EDIT POST ---------------- */
+
+  const updatePost = async () => {
+    if (!editingPostId) return;
+
+    await url.put(`/api/posts/${editingPostId}`, {
+      content: editPrompt,
+    });
+
+    setEditingPostId(null);
+    setEditPrompt("");
+
+    fetchPosts();
   };
 
   /* ---------------- INVITE USER ---------------- */
@@ -147,6 +175,7 @@ export default function CommunityDetailPage() {
 
       setInviteEmail("");
       setShowInvite(false);
+
       alert("Invite sent!");
     } catch {
       alert("Invite failed");
@@ -155,64 +184,11 @@ export default function CommunityDetailPage() {
     }
   };
 
-  /* ---------------- POST ACTIONS ---------------- */
-
-  const deletePost = (postId: string) => {
-    setPosts((post) => post.filter((p) => p.id !== postId));
-  };
-
-  const polishPost = (postId: string) => {
-    setPosts((post) =>
-      post.map((p) =>
-        p.id === postId ? { ...p, content: p.content + " ✨ Polished" } : p
-      )
-    );
-  };
-
-  const regeneratePost = async () => {
-    if (!editingPostId) return;
-
-    await new Promise((r) => setTimeout(r, 600));
-
-    setPosts((post) =>
-      post.map((p) =>
-        p.id === editingPostId
-          ? { ...p, content: p.content + " → " + editPrompt }
-          : p
-      )
-    );
-
-    setShowEditModal(false);
-    setEditPrompt("");
-    setEditingPostId(null);
-  };
-
-  /* ---------------- CUSTOM THEME ---------------- */
-
-  const addCustomTheme = async () => {
-    if (!customTheme.title.trim()) return;
-
-    try {
-      const res = await url.post("/api/themes/custom", {
-        communityId: id,
-        title: customTheme.title,
-        description: customTheme.description,
-      });
-
-      setThemes((prev) => [...prev, res.data.theme]);
-
-      setCustomTheme({ title: "", description: "" });
-      setShowCustomForm(false);
-    } catch {
-      alert("Failed to create theme");
-    }
-  };
-
   /* ---------------- SAFETY ---------------- */
 
   if (!community)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0B1120] text-white">
+      <div className="min-h-screen flex items-center justify-center text-white">
         Loading community...
       </div>
     );
@@ -220,214 +196,288 @@ export default function CommunityDetailPage() {
   /* ================================================= */
 
   return (
-    <div className="bg-[#0B1120] min-h-screen px-4 sm:px-6 py-10">
+    <div className="bg-[#0B1120] min-h-screen px-6 py-10">
 
       <div className="max-w-6xl mx-auto">
 
         {/* HEADER */}
+
         <div className="bg-[#111827] border border-gray-800 rounded-xl p-6 mb-8 flex justify-between items-center">
+
           <div>
-            <h1 className="text-xl text-white font-semibold">{community.name}</h1>
-            <p className="text-gray-400 mt-2 text-sm">{community.description}</p>
+            <h1 className="text-xl text-white font-semibold">
+              {community.name}
+            </h1>
+            <p className="text-gray-400 text-sm mt-2">
+              {community.description}
+            </p>
           </div>
 
-          {/* 🔥 INVITE BUTTON */}
+          {/* INVITE BUTTON */}
+
           <button
             onClick={() => setShowInvite(true)}
             className="bg-green-600 px-5 py-2 rounded text-white"
           >
             Invite
           </button>
+
         </div>
 
         {/* TABS */}
-        <div className="border-b border-gray-800 flex gap-6 mb-8">
-          {["posts", "themes"].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab as any)}
-              className={`pb-3 ${
-                activeTab === tab
-                  ? "text-blue-500 border-b-2 border-blue-500"
-                  : "text-gray-400"
-              }`}
-            >
-              {tab === "themes" ? "Themes" : "Your Posts"}
-            </button>
-          ))}
+
+        <div className="flex gap-6 border-b border-gray-800 mb-8">
+
+          <button
+            onClick={() => setActiveTab("posts")}
+            className={`pb-3 ${
+              activeTab === "posts"
+                ? "text-blue-500 border-b-2 border-blue-500"
+                : "text-gray-400"
+            }`}
+          >
+            Your Posts
+          </button>
+
+          <button
+            onClick={() => setActiveTab("themes")}
+            className={`pb-3 ${
+              activeTab === "themes"
+                ? "text-blue-500 border-b-2 border-blue-500"
+                : "text-gray-400"
+            }`}
+          >
+            Themes
+          </button>
+
         </div>
 
-        {/* THEMES TAB */}
-        {activeTab === "themes" && (
-          <>
-            {selectedTheme ? (
-              <div>
+        {/* ================= POSTS TAB ================= */}
+
+        {activeTab === "posts" && (
+          <div>
+            {posts.length === 0 ? (
+
+              <div className="bg-[#111827] border border-gray-800 rounded-xl p-16 text-center">
+
+                <p className="text-gray-400 mb-6">
+                  No posts generated yet
+                </p>
 
                 <button
-                  onClick={() => setSelectedTheme(null)}
-                  className="mb-6 text-blue-400 text-sm"
+                  onClick={() => setActiveTab("themes")}
+                  className="bg-blue-600 px-6 py-3 rounded text-white"
                 >
-                  ← Back to Themes
+                  Generate Themes First
                 </button>
 
-                <h2 className="text-lg text-white font-semibold mb-6">
-                  {selectedTheme.title}
-                </h2>
+              </div>
+
+            ) : (
+
+              <>
+                <div className="flex justify-end mb-6">
+
+                  <select
+                    value={selectedThemeFilter}
+                    onChange={(e) => {
+                      const value = e.target.value;
+
+                      setSelectedThemeFilter(value);
+
+                      if (value === "all") fetchPosts();
+                      else fetchPosts(value);
+                    }}
+                    className="bg-[#111827] border border-gray-700 text-white px-4 py-2 rounded"
+                  >
+
+                    <option value="all">All Themes</option>
+
+                    {themes.map((theme) => (
+                      <option key={theme.id} value={theme.id}>
+                        {theme.title}
+                      </option>
+                    ))}
+
+                  </select>
+
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6">
+
+                  {posts.map((post) => (
+
+                    <div
+                      key={post.id}
+                      className="bg-[#111827] border border-gray-800 rounded-xl p-5"
+                    >
+
+                      <span className="text-xs text-blue-400">
+                        {post.themeTitle}
+                      </span>
+
+                      <h3 className="text-white font-semibold mt-1">
+                        {post.title}
+                      </h3>
+
+                      <p className="text-gray-400 text-sm mt-2">
+                        {post.content}
+                      </p>
+
+                      <div className="flex gap-4 mt-4 text-sm">
+
+                        <button
+                          onClick={() => setEditingPostId(post.id)}
+                          className="text-blue-400"
+                        >
+                          Edit
+                        </button>
+
+                        <button
+                          onClick={() => deletePost(post.id)}
+                          className="text-red-400"
+                        >
+                          Delete
+                        </button>
+
+                        <button
+                          onClick={() => regeneratePost(post.id)}
+                          className="text-purple-400"
+                        >
+                          Regenerate
+                        </button>
+
+                      </div>
+
+                    </div>
+
+                  ))}
+
+                </div>
+
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ================= THEMES TAB ================= */}
+
+        {activeTab === "themes" && (
+
+          <div className="space-y-6">
+
+            <div className="flex justify-end">
+
+              <button
+                onClick={() => setShowCustomForm(!showCustomForm)}
+                className="bg-gray-700 px-5 py-2 rounded text-white"
+              >
+                + Add Custom Theme
+              </button>
+
+            </div>
+
+            {showCustomForm && (
+
+              <div className="bg-[#111827] border border-gray-700 rounded-xl p-6 space-y-4">
+
+                <input
+                  placeholder="Theme Title"
+                  value={customTheme.title}
+                  onChange={(e) =>
+                    setCustomTheme({
+                      ...customTheme,
+                      title: e.target.value,
+                    })
+                  }
+                  className="w-full bg-[#0F172A] px-4 py-3 rounded text-white"
+                />
+
+                <textarea
+                  placeholder="Theme Description"
+                  value={customTheme.description}
+                  onChange={(e) =>
+                    setCustomTheme({
+                      ...customTheme,
+                      description: e.target.value,
+                    })
+                  }
+                  className="w-full bg-[#0F172A] px-4 py-3 rounded text-white"
+                />
 
                 <button
-                  onClick={() => generatePosts(selectedTheme)}
-                  className="mb-8 bg-blue-600 px-6 py-3 rounded-lg text-white"
+                  onClick={addCustomTheme}
+                  className="bg-blue-600 px-6 py-2 rounded text-white"
+                >
+                  Add Theme
+                </button>
+
+              </div>
+
+            )}
+
+            {themes.length === 0 && (
+
+              <div className="bg-[#111827] rounded-xl p-12 text-center border border-gray-800">
+
+                <button
+                  onClick={generateThemes}
+                  className="bg-blue-600 px-6 py-3 rounded text-white"
+                >
+                  Generate Themes
+                </button>
+
+              </div>
+
+            )}
+
+            {themes.map((theme) => (
+
+              <div
+                key={theme.id}
+                className="bg-[#111827] border border-gray-800 rounded-xl p-5 flex justify-between"
+              >
+
+                <div>
+
+                  <h3 className="text-white font-semibold">
+                    {theme.title}
+                  </h3>
+
+                  <p className="text-gray-400 text-sm">
+                    {theme.description}
+                  </p>
+
+                </div>
+
+                <button
+                  onClick={() => generatePosts(theme)}
+                  className="bg-blue-600 px-4 py-2 rounded text-white text-sm"
                 >
                   Generate Posts
                 </button>
 
-                <div className="grid md:grid-cols-2 gap-6">
-                  {posts
-                    .filter((post) => post.themeId === selectedTheme.id)
-                    .map((post) => (
-                      <div
-                        key={post.id}
-                        className="bg-[#111827] border border-gray-800 rounded-xl p-5 space-y-3"
-                      >
-                        <span className="text-xs text-blue-400">
-                          {post.themeTitle}
-                        </span>
-
-                        <h3 className="text-white font-semibold">
-                          {post.title}
-                        </h3>
-
-                        <p className="text-gray-400 text-sm">
-                          {post.content}
-                        </p>
-
-                        <div className="flex gap-4 text-sm flex-wrap">
-                          <button
-                            onClick={() => {
-                              setEditingPostId(post.id);
-                              setShowEditModal(true);
-                            }}
-                            className="text-blue-400"
-                          >
-                            Edit
-                          </button>
-
-                          <button
-                            onClick={() => deletePost(post.id)}
-                            className="text-red-400"
-                          >
-                            Delete
-                          </button>
-
-                          <button
-                            onClick={() => polishPost(post.id)}
-                            className="text-purple-400"
-                          >
-                            Polish
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                </div>
               </div>
-            ) : themes.length === 0 ? (
-              <div className="bg-[#111827] rounded-xl p-12 text-center border border-gray-800">
-                <button
-                  onClick={generateThemes}
-                  className="bg-blue-600 px-6 py-3 rounded-lg text-white"
-                >
-                  Generate Themes
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-6">
 
-                <div className="flex justify-end">
-                  <button
-                    onClick={() => setShowCustomForm(!showCustomForm)}
-                    className="bg-gray-700 px-5 py-2 rounded-lg text-white text-sm"
-                  >
-                    + Add Custom Theme
-                  </button>
-                </div>
+            ))}
 
-                {showCustomForm && (
-                  <div className="bg-[#111827] border border-gray-700 rounded-xl p-6 space-y-4">
-                    <input
-                      placeholder="Title"
-                      value={customTheme.title}
-                      onChange={(e) =>
-                        setCustomTheme({
-                          ...customTheme,
-                          title: e.target.value,
-                        })
-                      }
-                      className="w-full bg-[#0F172A] px-4 py-3 rounded text-white"
-                    />
+          </div>
 
-                    <textarea
-                      placeholder="Description"
-                      value={customTheme.description}
-                      onChange={(e) =>
-                        setCustomTheme({
-                          ...customTheme,
-                          description: e.target.value,
-                        })
-                      }
-                      className="w-full bg-[#0F172A] px-4 py-3 rounded text-white"
-                    />
-
-                    <button
-                      onClick={addCustomTheme}
-                      className="bg-blue-600 px-6 py-2 rounded text-white"
-                    >
-                      Add Theme
-                    </button>
-                  </div>
-                )}
-
-                {themes.map((theme) => (
-                  <div
-                    key={theme.id}
-                    className="bg-[#111827] border border-gray-800 rounded-xl p-5 flex flex-col md:flex-row md:justify-between gap-4"
-                  >
-                    <div>
-                      <h3 className="text-white font-semibold">
-                        {theme.title}
-                      </h3>
-                      <p className="text-gray-400 text-sm">
-                        {theme.description}
-                      </p>
-                    </div>
-
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => setSelectedTheme(theme)}
-                        className="bg-blue-600 px-4 py-2 rounded text-white text-sm"
-                      >
-                        View Posts
-                      </button>
-
-                      <button
-                        onClick={() => deleteTheme(theme.id)}
-                        className="text-red-400 text-sm"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
         )}
+
       </div>
 
       {/* INVITE MODAL */}
+
       {showInvite && (
+
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center">
+
           <div className="bg-[#111827] p-8 rounded-xl w-96">
-            <h2 className="text-lg mb-4">Invite Member</h2>
+
+            <h2 className="text-lg mb-4 text-white">
+              Invite Member
+            </h2>
 
             <input
               type="email"
@@ -438,6 +488,7 @@ export default function CommunityDetailPage() {
             />
 
             <div className="flex justify-end gap-3">
+
               <button
                 onClick={() => setShowInvite(false)}
                 className="px-4 py-2 bg-gray-600 rounded"
@@ -452,10 +503,15 @@ export default function CommunityDetailPage() {
               >
                 {inviteLoading ? "Sending..." : "Send Invite"}
               </button>
+
             </div>
+
           </div>
+
         </div>
+
       )}
+
     </div>
   );
 }

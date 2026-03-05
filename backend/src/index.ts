@@ -6,9 +6,10 @@ import { Pool } from "pg";
 import { middleware as supertokensMiddleware,errorHandler as supertokensErrorHandler} from "supertokens-node/framework/express";
 import * as supertokensNode from "supertokens-node";
 import "./config/supertokens";
-import communityRoutes from "./routes/community.route";
-import themesRoutes from "./routes/themes.route";
-import inviteRoutes from "./routes/invite.route";
+import communityRoutes from "./routes/community.route.js";
+import themesRoutes from "./routes/themes.route.js";
+import inviteRoutes from "./routes/invite.route.js";
+import postsRoutes from "./routes/posts.routes.js";
 
 dotenv.config();
 
@@ -36,6 +37,7 @@ app.use(
 app.use("/api/community", communityRoutes);
 app.use("/api/themes", themesRoutes);
 app.use("/api/invite", inviteRoutes);
+app.use("/api/posts", postsRoutes);
 
 /* ---------------- SUPERTOKENS ---------------- */
 
