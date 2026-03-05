@@ -1,7 +1,7 @@
 import { db } from "../index.js";
 import { themes } from "../db/themes.schema";
 import { communityMembers } from "../db/communityMembers.schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 
 /* =========================================================
    VERIFY COMMUNITY MEMBERSHIP
@@ -97,7 +97,8 @@ export async function getThemesByCommunity(
   return db
     .select()
     .from(themes)
-    .where(eq(themes.communityId, communityId));
+    .where(eq(themes.communityId, communityId))
+    .orderBy(desc(themes.createdAt));
 }
 
 /* =========================================================

@@ -99,7 +99,7 @@ export default function CommunityDetailPage() {
       description: customTheme.description,
     });
 
-    setThemes((prev) => [res.data.theme,...prev]);
+    setThemes((prev) => [res.data.theme, ...prev]);
 
     setCustomTheme({ title: "", description: "" });
     setShowCustomForm(false);
@@ -142,7 +142,7 @@ export default function CommunityDetailPage() {
 
   const regeneratePost = async (postId: string) => {
     await url.patch(`/api/posts/${postId}/regenerate`);
-    fetchPosts();
+    fetchPosts(selectedThemeFilter === "all" ? undefined : selectedThemeFilter);
   };
 
   /* ---------------- EDIT POST ---------------- */
@@ -213,8 +213,6 @@ export default function CommunityDetailPage() {
             </p>
           </div>
 
-          {/* INVITE BUTTON */}
-
           <button
             onClick={() => setShowInvite(true)}
             className="bg-green-600 px-5 py-2 rounded text-white"
@@ -256,7 +254,41 @@ export default function CommunityDetailPage() {
 
         {activeTab === "posts" && (
           <div>
-            {posts.length === 0 ? (
+
+            {/* FILTER ALWAYS VISIBLE */}
+
+            {themes.length > 0 && (
+              <div className="flex justify-end mb-6">
+
+                <select
+                  value={selectedThemeFilter}
+                  onChange={(e) => {
+                    const value = e.target.value;
+
+                    setSelectedThemeFilter(value);
+
+                    if (value === "all") fetchPosts();
+                    else fetchPosts(value);
+                  }}
+                  className="bg-[#111827] border border-gray-700 text-white px-4 py-2 rounded"
+                >
+
+                  <option value="all">All Themes</option>
+
+                  {themes.map((theme) => (
+                    <option key={theme.id} value={theme.id}>
+                      {theme.title}
+                    </option>
+                  ))}
+
+                </select>
+
+              </div>
+            )}
+
+            {/* NO POSTS FOR COMMUNITY */}
+
+            {posts.length === 0 && selectedThemeFilter === "all" && (
 
               <div className="bg-[#111827] border border-gray-800 rounded-xl p-16 text-center">
 
@@ -273,90 +305,80 @@ export default function CommunityDetailPage() {
 
               </div>
 
-            ) : (
+            )}
 
-              <>
-                <div className="flex justify-end mb-6">
+            {/* NO POSTS FOR SELECTED THEME */}
 
-                  <select
-                    value={selectedThemeFilter}
-                    onChange={(e) => {
-                      const value = e.target.value;
+            {posts.length === 0 && selectedThemeFilter !== "all" && (
 
-                      setSelectedThemeFilter(value);
+              <div className="bg-[#111827] border border-gray-800 rounded-xl p-16 text-center">
 
-                      if (value === "all") fetchPosts();
-                      else fetchPosts(value);
-                    }}
-                    className="bg-[#111827] border border-gray-700 text-white px-4 py-2 rounded"
+                <p className="text-gray-400">
+                  No posts generated for this theme
+                </p>
+
+              </div>
+
+            )}
+
+            {/* POSTS LIST */}
+
+            {posts.length > 0 && (
+
+              <div className="grid md:grid-cols-2 gap-6">
+
+                {posts.map((post) => (
+
+                  <div
+                    key={post.id}
+                    className="bg-[#111827] border border-gray-800 rounded-xl p-5"
                   >
 
-                    <option value="all">All Themes</option>
+                    <span className="text-xs text-blue-400">
+                      {post.themeTitle}
+                    </span>
 
-                    {themes.map((theme) => (
-                      <option key={theme.id} value={theme.id}>
-                        {theme.title}
-                      </option>
-                    ))}
+                    <h3 className="text-white font-semibold mt-1">
+                      {post.title}
+                    </h3>
 
-                  </select>
+                    <p className="text-gray-400 text-sm mt-2">
+                      {post.content}
+                    </p>
 
-                </div>
+                    <div className="flex gap-4 mt-4 text-sm">
 
-                <div className="grid md:grid-cols-2 gap-6">
+                      <button
+                        onClick={() => setEditingPostId(post.id)}
+                        className="text-blue-400"
+                      >
+                        Edit
+                      </button>
 
-                  {posts.map((post) => (
+                      <button
+                        onClick={() => deletePost(post.id)}
+                        className="text-red-400"
+                      >
+                        Delete
+                      </button>
 
-                    <div
-                      key={post.id}
-                      className="bg-[#111827] border border-gray-800 rounded-xl p-5"
-                    >
-
-                      <span className="text-xs text-blue-400">
-                        {post.themeTitle}
-                      </span>
-
-                      <h3 className="text-white font-semibold mt-1">
-                        {post.title}
-                      </h3>
-
-                      <p className="text-gray-400 text-sm mt-2">
-                        {post.content}
-                      </p>
-
-                      <div className="flex gap-4 mt-4 text-sm">
-
-                        <button
-                          onClick={() => setEditingPostId(post.id)}
-                          className="text-blue-400"
-                        >
-                          Edit
-                        </button>
-
-                        <button
-                          onClick={() => deletePost(post.id)}
-                          className="text-red-400"
-                        >
-                          Delete
-                        </button>
-
-                        <button
-                          onClick={() => regeneratePost(post.id)}
-                          className="text-purple-400"
-                        >
-                          Regenerate
-                        </button>
-
-                      </div>
+                      <button
+                        onClick={() => regeneratePost(post.id)}
+                        className="text-purple-400"
+                      >
+                        Regenerate
+                      </button>
 
                     </div>
 
-                  ))}
+                  </div>
 
-                </div>
+                ))}
 
-              </>
+              </div>
+
             )}
+
           </div>
         )}
 
