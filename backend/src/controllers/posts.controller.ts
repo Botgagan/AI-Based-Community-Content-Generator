@@ -22,12 +22,13 @@ export async function getPostsController(
   try {
     const userId = await getPrimaryUserId(req);
 
-    const { themeId, communityId } = req.query;// Optional filters
+    const { themeId, communityId, page } = req.query;// Optional filters
 
     const posts = await getPosts({
       userId,
       themeId: themeId as string | undefined,
       communityId: communityId as string | undefined,
+      page: Number(page) || 1,
     });
 
     res.json({

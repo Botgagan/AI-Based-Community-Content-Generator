@@ -29,6 +29,11 @@ export default function HistoryPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [selectedCommunity, setSelectedCommunity] = useState("all");
 
+  /* ---------------- pagination ---------------- */
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+
   /* ---------------- LOAD COMMUNITIES ---------------- */
 
   const fetchCommunities = async () => {
@@ -42,16 +47,22 @@ export default function HistoryPage() {
 
   /* ---------------- LOAD POSTS ---------------- */
 
-  const fetchPosts = async (communityId?: string) => {
+  const fetchPosts = async (communityId?: string, page = 1) => {
     try {
 
       const query = communityId
-        ? `?communityId=${communityId}`
-        : "";
+        ? `?communityId=${communityId}&page=${page}`
+        : `?page=${page}`;
 
       const res = await url.get(`/api/posts${query}`);
 
-      setPosts(res.data.posts || []);
+      const data = res.data.posts || [];
+
+      setPosts(data);
+      setCurrentPage(page);
+
+      // if less than 10 returned, no more pages
+      setHasMore(data.length === 10);
 
     } catch (err) {
       console.error("Failed to load posts", err);
@@ -70,12 +81,14 @@ export default function HistoryPage() {
   const handleFilterChange = async (value: string) => {
 
     setSelectedCommunity(value);
+    setCurrentPage(1);
 
     if (value === "all") {
-      fetchPosts();
+      fetchPosts(undefined, 1);
     } else {
-      fetchPosts(value);
+      fetchPosts(value, 1);
     }
+
   };
 
   /* ---------------- UI ---------------- */
@@ -124,53 +137,104 @@ export default function HistoryPage() {
         {posts.length === 0 ? (
 
           <div className="bg-[#111827] border border-gray-800 rounded-xl p-16 text-center">
-
             <p className="text-gray-400">
               No posts found
             </p>
-
           </div>
 
         ) : (
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <>
+          
+            {/* POSTS GRID */}
 
-            {posts.map((post) => (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
-              <div
-                key={post.id}
-                className="bg-[#111827] border border-gray-800 rounded-xl p-6 space-y-3 hover:border-blue-600 transition"
+              {posts.map((post) => (
+
+                <div
+                  key={post.id}
+                  className="bg-[#111827] border border-gray-800 rounded-xl p-6 space-y-3 hover:border-blue-600 transition"
+                >
+
+                  {/* COMMUNITY */}
+
+                  <span className="text-xs text-blue-400">
+                    {post.communityName}
+                  </span>
+
+                  {/* TITLE */}
+
+                  <h3 className="text-white font-semibold">
+                    {post.title}
+                  </h3>
+
+                  {/* THEME */}
+
+                  <p className="text-xs text-purple-400">
+                    {post.themeTitle}
+                  </p>
+
+                  {/* CONTENT */}
+
+                  <p className="text-gray-400 text-sm">
+                    {post.content}
+                  </p>
+
+                </div>
+
+              ))}
+
+            </div>
+
+
+            {/* PAGINATION */}
+
+            <div className="flex justify-center gap-4 mt-10">
+
+              {/* PREVIOUS */}
+
+              <button
+                disabled={currentPage === 1}
+                onClick={() =>
+                  fetchPosts(
+                    selectedCommunity === "all"
+                      ? undefined
+                      : selectedCommunity,
+                    currentPage - 1
+                  )
+                }
+                className="px-4 py-2 bg-gray-700 text-white rounded disabled:opacity-40"
               >
+                Previous
+              </button>
 
-                {/* COMMUNITY */}
+              {/* PAGE NUMBER */}
 
-                <span className="text-xs text-blue-400">
-                  {post.communityName}
-                </span>
+              <span className="text-white px-4 py-2">
+                Page {currentPage}
+              </span>
 
-                {/* TITLE */}
+              {/* NEXT */}
 
-                <h3 className="text-white font-semibold">
-                  {post.title}
-                </h3>
+              <button
+                disabled={!hasMore}
+                onClick={() =>
+                  fetchPosts(
+                    selectedCommunity === "all"
+                      ? undefined
+                      : selectedCommunity,
+                    currentPage + 1
+                  )
+                }
+                className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-40"
+              >
+                Next
+              </button>
 
-                {/* THEME */}
+            </div>
 
-                <p className="text-xs text-purple-400">
-                  {post.themeTitle}
-                </p>
-
-                {/* CONTENT */}
-
-                <p className="text-gray-400 text-sm">
-                  {post.content}
-                </p>
-
-              </div>
-
-            ))}
-
-          </div>
+          </>
 
         )}
 

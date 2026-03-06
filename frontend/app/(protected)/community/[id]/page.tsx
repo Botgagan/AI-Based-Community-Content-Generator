@@ -54,6 +54,10 @@ export default function CommunityDetailPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteLoading, setInviteLoading] = useState(false);
 
+  /* ---------------- pagination ---------------- */
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+
   /* ---------------- LOAD DATA ---------------- */
 
   useEffect(() => {
@@ -72,10 +76,20 @@ export default function CommunityDetailPage() {
     setThemes(res.data.themes || []);
   };
 
-  const fetchPosts = async (themeId?: string) => {
-    const query = themeId ? `?themeId=${themeId}` : `?communityId=${id}`;
+  const fetchPosts = async (themeId?: string, page = 1) => {
+    const query = themeId
+      ? `?themeId=${themeId}&page=${page}`
+      : `?communityId=${id}&page=${page}`;
+
     const res = await url.get(`/api/posts${query}`);
-    setPosts(res.data.posts || []);
+
+    const data = res.data.posts || [];
+
+    setPosts(data);
+    setCurrentPage(page);
+
+    // If less than 10 posts returned, there is no next page
+    setHasMore(data.length === 10);
   };
 
   /* ---------------- GENERATE THEMES ---------------- */
@@ -228,22 +242,20 @@ export default function CommunityDetailPage() {
 
           <button
             onClick={() => setActiveTab("posts")}
-            className={`pb-3 ${
-              activeTab === "posts"
-                ? "text-blue-500 border-b-2 border-blue-500"
-                : "text-gray-400"
-            }`}
+            className={`pb-3 ${activeTab === "posts"
+              ? "text-blue-500 border-b-2 border-blue-500"
+              : "text-gray-400"
+              }`}
           >
             Your Posts
           </button>
 
           <button
             onClick={() => setActiveTab("themes")}
-            className={`pb-3 ${
-              activeTab === "themes"
-                ? "text-blue-500 border-b-2 border-blue-500"
-                : "text-gray-400"
-            }`}
+            className={`pb-3 ${activeTab === "themes"
+              ? "text-blue-500 border-b-2 border-blue-500"
+              : "text-gray-400"
+              }`}
           >
             Themes
           </button>
@@ -267,8 +279,11 @@ export default function CommunityDetailPage() {
 
                     setSelectedThemeFilter(value);
 
-                    if (value === "all") fetchPosts();
-                    else fetchPosts(value);
+                    if (value === "all") {
+                      fetchPosts(undefined, 1);
+                    } else {
+                      fetchPosts(value, 1);
+                    }
                   }}
                   className="bg-[#111827] border border-gray-700 text-white px-4 py-2 rounded"
                 >
@@ -377,6 +392,44 @@ export default function CommunityDetailPage() {
 
               </div>
 
+            )}
+            {posts.length > 0 && (
+              <div className="flex justify-center gap-4 mt-10">
+
+                {/* PREVIOUS BUTTON */}
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() =>
+                    fetchPosts(
+                      selectedThemeFilter === "all" ? undefined : selectedThemeFilter,
+                      currentPage - 1
+                    )
+                  }
+                  className="px-4 py-2 bg-gray-700 text-white rounded disabled:opacity-40"
+                >
+                  Previous
+                </button>
+
+                {/* CURRENT PAGE */}
+                <span className="text-white px-4 py-2">
+                  Page {currentPage}
+                </span>
+
+                {/* NEXT BUTTON */}
+                <button
+                  disabled={!hasMore}
+                  onClick={() =>
+                    fetchPosts(
+                      selectedThemeFilter === "all" ? undefined : selectedThemeFilter,
+                      currentPage + 1
+                    )
+                  }
+                  className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-40"
+                >
+                  Next
+                </button>
+
+              </div>
             )}
 
           </div>

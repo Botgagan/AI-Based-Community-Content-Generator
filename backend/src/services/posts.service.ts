@@ -17,11 +17,17 @@ export async function getPosts({
   userId,
   themeId,
   communityId,
+  page = 1,
 }: {
   userId: string;
   themeId?: string;
   communityId?: string;
+  page?: number;
 }) {
+
+   const limit = 10;
+   const offset = (page -1) * limit;
+
   const conditions = [
     eq(communityMembers.userId, userId),
   ];
@@ -52,7 +58,9 @@ export async function getPosts({
       eq(communityMembers.communityId, communities.id)
     )
     .where(and(...conditions))
-    .orderBy(desc(posts.createdAt));
+    .orderBy(desc(posts.createdAt))
+    .limit(limit)
+    .offset(offset);
 
   return query;
 }
