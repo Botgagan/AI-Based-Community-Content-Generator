@@ -48,10 +48,25 @@ export async function getCommunitiesController(
   res: Response
 ) {
   try {
+
     const userId = await getPrimaryUserId(req);
-    const data = await getUserCommunities(userId);
-    res.json({ success: true, communities: data });
+
+    const { page, limit, all } = req.query;
+
+    const communities = await getUserCommunities({
+      userId,
+      page: Number(page) || 1,
+      limit: Number(limit) || 10,
+      all: all === "true",
+    });
+
+    res.json({
+      success: true,
+      communities,
+    });
+
   } catch (err: any) {
+    console.error("COMMUNITY LIST ERROR:", err);
     res.status(500).json({ message: err.message });
   }
 }

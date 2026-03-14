@@ -78,19 +78,33 @@ export async function getThemesController(
   res: Response
 ) {
   try {
+
     const userId = await getPrimaryUserId(req);
-    const { communityId } = req.params;
+
+    const { communityId } = req.query;
+
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
 
     if (!communityId) {
       return res.status(400).json({ message: "communityId required" });
     }
 
-    const themes = await getThemesByCommunity(communityId, userId);
+    const themes = await getThemesByCommunity({
+      communityId: communityId as string,
+      userId,
+      page,
+      limit,
+    });
 
-    res.json({ success: true, themes });
+    res.json({
+      success: true,
+      themes,
+    });
+
   } catch (err: any) {
-    console.error("get themes error:", err);
     res.status(403).json({ message: err.message });
+    console.error("get themes error:", err);
   }
 }
 

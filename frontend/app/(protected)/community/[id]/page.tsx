@@ -33,6 +33,7 @@ export default function CommunityDetailPage() {
 
   const [community, setCommunity] = useState<Community | null>(null);
   const [themes, setThemes] = useState<Theme[]>([]);
+  const [allThemes, setAllThemes] = useState<Theme[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
 
   const [activeTab, setActiveTab] = useState<"themes" | "posts">("posts");
@@ -64,6 +65,7 @@ export default function CommunityDetailPage() {
     fetchCommunity();
     fetchThemes();
     fetchPosts();
+    fetchAllThemes();
   }, [id]);
 
   const fetchCommunity = async () => {
@@ -71,10 +73,29 @@ export default function CommunityDetailPage() {
     setCommunity(res.data.community);
   };
 
-  const fetchThemes = async () => {
-    const res = await url.get(`/api/themes/${id}`);
-    setThemes(res.data.themes || []);
+  const fetchThemes = async (page = 1) => {
+
+    const res = await url.get(
+      `/api/themes?communityId=${id}&page=${page}`
+    );
+
+    const data = res.data.themes || [];
+
+    setThemes(data);
+
+    setCurrentPage(page);
+
+    setHasMore(data.length === 10);
   };
+
+  const fetchAllThemes = async () => {
+
+  const res = await url.get(
+    `/api/themes?communityId=${id}&limit=1000`
+  );
+
+  setAllThemes(res.data.themes || []);
+};
 
   const fetchPosts = async (themeId?: string, page = 1) => {
     const query = themeId
@@ -114,9 +135,11 @@ export default function CommunityDetailPage() {
     });
 
     setThemes((prev) => [res.data.theme, ...prev]);
+    fetchAllThemes();
 
     setCustomTheme({ title: "", description: "" });
     setShowCustomForm(false);
+
   };
 
   /* ---------------- GENERATE POSTS ---------------- */
@@ -290,7 +313,7 @@ export default function CommunityDetailPage() {
 
                   <option value="all">All Themes</option>
 
-                  {themes.map((theme) => (
+                  {allThemes.map((theme) => (
                     <option key={theme.id} value={theme.id}>
                       {theme.title}
                     </option>
@@ -535,6 +558,33 @@ export default function CommunityDetailPage() {
               </div>
 
             ))}
+            {themes.length > 0 && (
+
+              <div className="flex justify-center gap-4 mt-10">
+
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => fetchThemes(currentPage - 1)}
+                  className="px-4 py-2 bg-gray-700 text-white rounded disabled:opacity-40"
+                >
+                  Previous
+                </button>
+
+                <span className="text-white px-4 py-2">
+                  Page {currentPage}
+                </span>
+
+                <button
+                  disabled={!hasMore}
+                  onClick={() => fetchThemes(currentPage + 1)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-40"
+                >
+                  Next
+                </button>
+
+              </div>
+
+            )}
 
           </div>
 

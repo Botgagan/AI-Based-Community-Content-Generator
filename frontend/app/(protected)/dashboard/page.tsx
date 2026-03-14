@@ -15,15 +15,30 @@ export default function DashboardPage() {
   const [communities, setCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(true);
 
+  /* pagination */
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+
   /* ---------------- FETCH ---------------- */
 
-  const fetchCommunities = async () => {
+  const fetchCommunities = async (page = 1) => {
     try {
-      const res = await url.get("/api/community/list");
-      setCommunities(res.data.communities);
+
+      const res = await url.get(`/api/community/list?page=${page}`);
+
+      const data = res.data.communities || [];
+
+      setCommunities(data);
+      setCurrentPage(page);
+
+      setHasMore(data.length === 10);
+
     } catch (err: any) {
-      console.error(err);
-      if (err?.response?.status === 401) router.push("/auth");
+
+      if (err?.response?.status === 401) {
+        router.push("/auth");
+      }
+
     } finally {
       setLoading(false);
     }
@@ -48,14 +63,6 @@ export default function DashboardPage() {
       alert("Failed to delete community");
     }
   };
-
-  /* ---------------- STATS ---------------- */
-
-  const stats = [
-    { label: "Total Communities", value: communities.length },
-    { label: "AI Content Generated", value: "0" },
-    { label: "Engagement Rate", value: "0%" },
-  ];
 
   /* ---------------- UI ---------------- */
 
@@ -109,20 +116,6 @@ export default function DashboardPage() {
 
         ) : (
           <>
-            {/* STATS */}
-            <div className="grid md:grid-cols-3 gap-6 mb-12">
-              {stats.map((stat, index) => (
-                <div
-                  key={index}
-                  className="bg-[#111827] border border-gray-800 rounded-xl p-6"
-                >
-                  <p className="text-gray-400 text-sm">{stat.label}</p>
-                  <p className="text-white text-2xl font-semibold mt-2">
-                    {stat.value}
-                  </p>
-                </div>
-              ))}
-            </div>
 
             {/* CARDS */}
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -174,6 +167,33 @@ export default function DashboardPage() {
                 </div>
               ))}
             </div>
+            {communities.length > 0 && (
+
+              <div className="flex justify-center gap-4 mt-10">
+
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => fetchCommunities(currentPage - 1)}
+                  className="px-4 py-2 bg-gray-700 text-white rounded disabled:opacity-40"
+                >
+                  Previous
+                </button>
+
+                <span className="text-white px-4 py-2">
+                  Page {currentPage}
+                </span>
+
+                <button
+                  disabled={!hasMore}
+                  onClick={() => fetchCommunities(currentPage + 1)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-40"
+                >
+                  Next
+                </button>
+
+              </div>
+
+            )}
           </>
         )}
       </div>

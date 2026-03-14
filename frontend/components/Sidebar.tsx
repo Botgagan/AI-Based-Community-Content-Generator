@@ -11,7 +11,7 @@ export default function Sidebar() {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await url.get("/api/community/list");
+        const res = await url.get(`/api/community/list?all=true`);
         setCommunities(res.data.communities || []);
       } catch (err) {
         console.error(err);

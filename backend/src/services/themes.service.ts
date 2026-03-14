@@ -88,17 +88,29 @@ export async function createCustomTheme(
    GET THEMES
 ========================================================= */
 
-export async function getThemesByCommunity(
-  communityId: string,
-  userId: string
-) {
+export async function getThemesByCommunity({
+  communityId,
+  userId,
+  page = 1,
+  limit = 10,
+}: {
+  communityId: string;
+  userId: string;
+  page?: number;
+  limit?: number;
+}) {
+
   await verifyCommunityMembership(communityId, userId);
+
+  const offset = (page - 1) * limit;
 
   return db
     .select()
     .from(themes)
     .where(eq(themes.communityId, communityId))
-    .orderBy(desc(themes.createdAt));
+    .orderBy(desc(themes.createdAt))
+    .limit(limit)
+    .offset(offset);
 }
 
 /* =========================================================

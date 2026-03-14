@@ -12,23 +12,28 @@ export default function ProtectedLayout({
 }) {
   return (
     <SessionAuth requireAuth>
-      <div className="min-h-screen flex flex-col bg-[#0B1120]">
+      <div className="h-screen flex flex-col bg-[#0B1120]">
 
+        {/* Navbar */}
         <NavbarComponent />
 
-        <div className="flex flex-1">
+        {/* Main area */}
+        <div className="flex flex-1 overflow-hidden">
 
           {/* Sidebar */}
-          <Sidebar />
+          <aside className="w-64 border-r border-gray-800 overflow-y-auto">
+            <Sidebar />
+          </aside>
 
           {/* Page Content */}
-          <main className="flex-1 p-6 overflow-y-auto">
+          <main className="flex-1 overflow-y-auto p-6">
             {children}
           </main>
 
         </div>
 
-        <FooterComponent />
+        {/* Footer */}
+       {/* <FooterComponent />*/}
 
       </div>
     </SessionAuth>

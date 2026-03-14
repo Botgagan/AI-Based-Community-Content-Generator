@@ -1,7 +1,7 @@
 import { db } from "../index.js";
 import { communities } from "../db/community.schema.js";
 import { communityMembers } from "../db/communityMembers.schema.js";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc} from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 /* CREATE COMMUNITY */
@@ -32,10 +32,19 @@ export async function createCommunity(data: any, userId: string) {
 
 /* GET USER COMMUNITIES */
 
-export async function getUserCommunities(userId: string) {
-  if (!userId) return [];
+export async function getUserCommunities({
+  userId,
+  page = 1,
+  limit = 10,
+  all = false,
+}: {
+  userId: string
+  page?: number
+  limit?: number
+  all?: boolean
+}) {
 
-  return await db
+  const baseQuery = db
     .select({
       id: communities.id,
       name: communities.name,
@@ -47,7 +56,16 @@ export async function getUserCommunities(userId: string) {
       communities,
       eq(communityMembers.communityId, communities.id)
     )
-    .where(eq(communityMembers.userId, userId));
+    .where(eq(communityMembers.userId, userId))
+    .orderBy(desc(communities.createdAt));
+
+  if (all) {
+    return baseQuery;
+  }
+
+  const offset = (page - 1) * limit;
+
+  return baseQuery.limit(limit).offset(offset);
 }
 
 /* GET COMMUNITY BY ID (ONLY IF MEMBER) */
