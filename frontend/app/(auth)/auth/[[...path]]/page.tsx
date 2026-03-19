@@ -31,7 +31,7 @@ export default function AuthPage() {
         }
 
         setLoading(false);
-      } catch (err) {
+      } catch {
         setLoading(false);
       }
     };
@@ -41,17 +41,18 @@ export default function AuthPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="bg-app-gradient flex min-h-screen items-center justify-center text-[#6b7280]">
         Loading...
       </div>
     );
   }
 
   if (canHandleRoute([ThirdPartyPreBuiltUI, PasswordlessPreBuiltUI])) {
-    return getRoutingComponent([
-      ThirdPartyPreBuiltUI,
-      PasswordlessPreBuiltUI,
-    ]);
+    return (
+      <div className="bg-app-gradient flex min-h-screen items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md">{getRoutingComponent([ThirdPartyPreBuiltUI, PasswordlessPreBuiltUI])}</div>
+      </div>
+    );
   }
 
   return null;

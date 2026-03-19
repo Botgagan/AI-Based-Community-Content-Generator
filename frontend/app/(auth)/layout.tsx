@@ -11,7 +11,7 @@ export default function AuthLayout({ children }) {
     Session.doesSessionExist().then((exists) => {
       if (exists) router.replace("/dashboard");
     });
-  }, []);
+  }, [router]);
 
   return children;
 }

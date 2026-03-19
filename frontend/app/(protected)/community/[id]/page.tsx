@@ -3,8 +3,8 @@
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { url } from "@/lib/axiosInstance";
-
-/* ---------------- TYPES ---------------- */
+import InviteModal from "@/components/InviteModal";
+import { AxiosError } from "axios";
 
 type Community = {
   id: string;
@@ -26,7 +26,7 @@ type Post = {
   themeTitle: string;
 };
 
-/* ---------------- PAGE ---------------- */
+const PAGE_SIZE = 10;
 
 export default function CommunityDetailPage() {
   const { id } = useParams() as { id: string };
@@ -37,7 +37,6 @@ export default function CommunityDetailPage() {
   const [posts, setPosts] = useState<Post[]>([]);
 
   const [activeTab, setActiveTab] = useState<"themes" | "posts">("posts");
-
   const [selectedThemeFilter, setSelectedThemeFilter] = useState("all");
 
   const [showCustomForm, setShowCustomForm] = useState(false);
@@ -49,100 +48,118 @@ export default function CommunityDetailPage() {
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editPrompt, setEditPrompt] = useState("");
 
-  /* ---------------- INVITE STATES ---------------- */
-
   const [showInvite, setShowInvite] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteLoading, setInviteLoading] = useState(false);
+  const [banner, setBanner] = useState<string | null>(null);
+  const [bannerType, setBannerType] = useState<"success" | "error">("success");
+  const [isGeneratingThemes, setIsGeneratingThemes] = useState(false);
 
-  /* ---------------- pagination ---------------- */
-  const [currentPage, setCurrentPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const [themesPage, setThemesPage] = useState(1);
+  const [themesHasMore, setThemesHasMore] = useState(true);
 
-  /* ---------------- LOAD DATA ---------------- */
-
-  useEffect(() => {
-    fetchCommunity();
-    fetchThemes();
-    fetchPosts();
-    fetchAllThemes();
-  }, [id]);
-
-  const fetchCommunity = async () => {
-    const res = await url.get(`/api/community/${id}`);
-    setCommunity(res.data.community);
-  };
+  const [postsPage, setPostsPage] = useState(1);
+  const [postsHasMore, setPostsHasMore] = useState(true);
 
   const fetchThemes = async (page = 1) => {
-
-    const res = await url.get(
-      `/api/themes?communityId=${id}&page=${page}`
-    );
-
+    const [res, nextPageRes] = await Promise.all([
+      url.get(`/api/themes?communityId=${id}&page=${page}&limit=${PAGE_SIZE}`),
+      url.get(`/api/themes?communityId=${id}&page=${page + 1}&limit=${PAGE_SIZE}`),
+    ]);
     const data = res.data.themes || [];
+    const nextPageData = nextPageRes.data.themes || [];
 
     setThemes(data);
-
-    setCurrentPage(page);
-
-    setHasMore(data.length === 10);
+    setThemesPage(page);
+    setThemesHasMore(nextPageData.length > 0);
   };
 
   const fetchAllThemes = async () => {
-
-  const res = await url.get(
-    `/api/themes?communityId=${id}&limit=1000`
-  );
-
-  setAllThemes(res.data.themes || []);
-};
+    const res = await url.get(`/api/themes?communityId=${id}&limit=1000`);
+    setAllThemes(res.data.themes || []);
+  };
 
   const fetchPosts = async (themeId?: string, page = 1) => {
-    const query = themeId
-      ? `?themeId=${themeId}&page=${page}`
-      : `?communityId=${id}&page=${page}`;
+    const query = themeId ? `?themeId=${themeId}&page=${page}` : `?communityId=${id}&page=${page}`;
 
     const res = await url.get(`/api/posts${query}`);
-
     const data = res.data.posts || [];
 
     setPosts(data);
-    setCurrentPage(page);
-
-    // If less than 10 posts returned, there is no next page
-    setHasMore(data.length === 10);
+    setPostsPage(page);
+    setPostsHasMore(data.length === PAGE_SIZE);
   };
 
-  /* ---------------- GENERATE THEMES ---------------- */
+  useEffect(() => {
+    const init = async () => {
+      const [communityRes, themesRes, nextThemesRes, postsRes, allThemesRes] = await Promise.all([
+        url.get(`/api/community/${id}`),
+        url.get(`/api/themes?communityId=${id}&page=1&limit=${PAGE_SIZE}`),
+        url.get(`/api/themes?communityId=${id}&page=2&limit=${PAGE_SIZE}`),
+        url.get(`/api/posts?communityId=${id}&page=1`),
+        url.get(`/api/themes?communityId=${id}&limit=1000`),
+      ]);
+
+      const initialThemes = themesRes.data.themes || [];
+      const nextThemes = nextThemesRes.data.themes || [];
+      const initialPosts = postsRes.data.posts || [];
+
+      setCommunity(communityRes.data.community);
+      setThemes(initialThemes);
+      setThemesPage(1);
+      setThemesHasMore(nextThemes.length > 0);
+      setPosts(initialPosts);
+      setPostsPage(1);
+      setPostsHasMore(initialPosts.length === PAGE_SIZE);
+      setAllThemes(allThemesRes.data.themes || []);
+    };
+
+    init();
+  }, [id]);
 
   const generateThemes = async () => {
-    const res = await url.post("/api/themes/generate", {
-      communityId: id,
-    });
+    if (isGeneratingThemes) return;
 
-    setThemes(res.data.themes);
+    setIsGeneratingThemes(true);
+    setBanner(null);
+    setBannerType("success");
+
+    try {
+      await url.post(
+        "/api/themes/generate",
+        { communityId: id },
+        { timeout: 130000 }
+      );
+      await Promise.all([fetchThemes(1), fetchAllThemes()]);
+      setBannerType("success");
+      setBanner("Themes generated successfully.");
+    } catch (error) {
+      const err = error as AxiosError<{ message?: string }>;
+      const message =
+        err.code === "ECONNABORTED"
+          ? "Theme generation timed out. Please try again."
+          : err.response?.data?.message || "Failed to generate themes.";
+      setBannerType("error");
+      setBanner(message);
+    } finally {
+      setIsGeneratingThemes(false);
+    }
   };
-
-  /* ---------------- ADD CUSTOM THEME ---------------- */
 
   const addCustomTheme = async () => {
     if (!customTheme.title.trim()) return;
 
-    const res = await url.post("/api/themes/custom", {
+    await url.post("/api/themes/custom", {
       communityId: id,
       title: customTheme.title,
       description: customTheme.description,
     });
 
-    setThemes((prev) => [res.data.theme, ...prev]);
-    fetchAllThemes();
+    await Promise.all([fetchThemes(1), fetchAllThemes()]);
 
     setCustomTheme({ title: "", description: "" });
     setShowCustomForm(false);
-
+    setBannerType("success");
+    setBanner("Custom theme added.");
   };
-
-  /* ---------------- GENERATE POSTS ---------------- */
 
   const generatePosts = async (theme: Theme) => {
     const dummyPosts = [
@@ -164,25 +181,21 @@ export default function CommunityDetailPage() {
       });
     }
 
-    await fetchPosts();
+    await fetchPosts(selectedThemeFilter === "all" ? undefined : selectedThemeFilter, 1);
     setActiveTab("posts");
+    setBannerType("success");
+    setBanner("Posts generated for selected theme.");
   };
-
-  /* ---------------- DELETE POST ---------------- */
 
   const deletePost = async (postId: string) => {
     await url.delete(`/api/posts/${postId}`);
-    setPosts((prev) => prev.filter((p) => p.id !== postId));
+    await fetchPosts(selectedThemeFilter === "all" ? undefined : selectedThemeFilter, postsPage);
   };
-
-  /* ---------------- REGENERATE POST ---------------- */
 
   const regeneratePost = async (postId: string) => {
     await url.patch(`/api/posts/${postId}/regenerate`);
-    fetchPosts(selectedThemeFilter === "all" ? undefined : selectedThemeFilter);
+    await fetchPosts(selectedThemeFilter === "all" ? undefined : selectedThemeFilter, postsPage);
   };
-
-  /* ---------------- EDIT POST ---------------- */
 
   const updatePost = async () => {
     if (!editingPostId) return;
@@ -194,291 +207,191 @@ export default function CommunityDetailPage() {
     setEditingPostId(null);
     setEditPrompt("");
 
-    fetchPosts();
+    await fetchPosts(selectedThemeFilter === "all" ? undefined : selectedThemeFilter, postsPage);
   };
 
-  /* ---------------- INVITE USER ---------------- */
-
-  const sendInvite = async () => {
-    if (!inviteEmail.trim()) return;
-
-    try {
-      setInviteLoading(true);
-
-      await url.post("/api/invite/send", {
-        communityId: id,
-        email: inviteEmail,
-      });
-
-      setInviteEmail("");
-      setShowInvite(false);
-
-      alert("Invite sent!");
-    } catch {
-      alert("Invite failed");
-    } finally {
-      setInviteLoading(false);
-    }
-  };
-
-  /* ---------------- SAFETY ---------------- */
-
-  if (!community)
+  if (!community) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-white">
+      <div className="min-h-screen flex items-center justify-center text-[#6b7280]">
         Loading community...
       </div>
     );
-
-  /* ================================================= */
+  }
 
   return (
-    <div className="bg-[#0B1120] min-h-screen px-6 py-10">
-
-      <div className="max-w-6xl mx-auto">
-
-        {/* HEADER */}
-
-        <div className="bg-[#111827] border border-gray-800 rounded-xl p-6 mb-8 flex justify-between items-center">
-
+    <div className="min-h-screen bg-app-gradient px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl">
+        <div className="panel mb-6 flex flex-col gap-4 rounded-2xl p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-xl text-white font-semibold">
-              {community.name}
-            </h1>
-            <p className="text-gray-400 text-sm mt-2">
-              {community.description}
-            </p>
+            <h1 className="text-2xl font-semibold text-[#111827]">{community.name}</h1>
+            <p className="mt-1 text-sm text-[#6b7280]">{community.description}</p>
           </div>
 
-          <button
-            onClick={() => setShowInvite(true)}
-            className="bg-green-600 px-5 py-2 rounded text-white"
-          >
-            Invite
+          <button onClick={() => setShowInvite(true)} className="btn-primary px-5 py-2.5 text-sm">
+            Invite Members
           </button>
-
         </div>
 
-        {/* TABS */}
+        {banner && (
+          <div
+            className={`mb-6 rounded-xl px-4 py-3 text-sm ${bannerType === "success"
+                ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border border-rose-200 bg-rose-50 text-rose-700"
+              }`}
+          >
+            {banner}
+          </div>
+        )}
 
-        <div className="flex gap-6 border-b border-gray-800 mb-8">
-
+        <div className="tab-shell mb-6 flex gap-2">
           <button
             onClick={() => setActiveTab("posts")}
-            className={`pb-3 ${activeTab === "posts"
-              ? "text-blue-500 border-b-2 border-blue-500"
-              : "text-gray-400"
-              }`}
+            className={`tab-btn flex-1 ${activeTab === "posts" ? "tab-btn-active" : ""}`}
           >
             Your Posts
           </button>
 
           <button
             onClick={() => setActiveTab("themes")}
-            className={`pb-3 ${activeTab === "themes"
-              ? "text-blue-500 border-b-2 border-blue-500"
-              : "text-gray-400"
-              }`}
+            className={`tab-btn flex-1 ${activeTab === "themes" ? "tab-btn-active" : ""}`}
           >
             Themes
           </button>
-
         </div>
-
-        {/* ================= POSTS TAB ================= */}
 
         {activeTab === "posts" && (
           <div>
-
-            {/* FILTER ALWAYS VISIBLE */}
-
-            {themes.length > 0 && (
-              <div className="flex justify-end mb-6">
-
+            {allThemes.length > 0 && (
+              <div className="mb-6 flex justify-end">
                 <select
                   value={selectedThemeFilter}
                   onChange={(e) => {
                     const value = e.target.value;
-
                     setSelectedThemeFilter(value);
-
-                    if (value === "all") {
-                      fetchPosts(undefined, 1);
-                    } else {
-                      fetchPosts(value, 1);
-                    }
+                    fetchPosts(value === "all" ? undefined : value, 1);
                   }}
-                  className="bg-[#111827] border border-gray-700 text-white px-4 py-2 rounded"
+                  className="input-field w-full md:w-64"
                 >
-
                   <option value="all">All Themes</option>
-
                   {allThemes.map((theme) => (
                     <option key={theme.id} value={theme.id}>
                       {theme.title}
                     </option>
                   ))}
-
                 </select>
-
               </div>
             )}
 
-            {/* NO POSTS FOR COMMUNITY */}
-
-            {posts.length === 0 && selectedThemeFilter === "all" && (
-
-              <div className="bg-[#111827] border border-gray-800 rounded-xl p-16 text-center">
-
-                <p className="text-gray-400 mb-6">
-                  No posts generated yet
+            {posts.length === 0 && (
+              <div className="panel rounded-xl p-12 text-center">
+                <p className="mb-5 text-[#6b7280]">
+                  {selectedThemeFilter === "all"
+                    ? "No posts generated yet."
+                    : "No posts generated for this theme."}
                 </p>
 
-                <button
-                  onClick={() => setActiveTab("themes")}
-                  className="bg-blue-600 px-6 py-3 rounded text-white"
-                >
-                  Generate Themes First
-                </button>
-
+                {selectedThemeFilter === "all" && (
+                  <button onClick={() => setActiveTab("themes")} className="btn-primary px-6 py-2.5">
+                    Create from Themes
+                  </button>
+                )}
               </div>
-
             )}
-
-            {/* NO POSTS FOR SELECTED THEME */}
-
-            {posts.length === 0 && selectedThemeFilter !== "all" && (
-
-              <div className="bg-[#111827] border border-gray-800 rounded-xl p-16 text-center">
-
-                <p className="text-gray-400">
-                  No posts generated for this theme
-                </p>
-
-              </div>
-
-            )}
-
-            {/* POSTS LIST */}
 
             {posts.length > 0 && (
-
-              <div className="grid md:grid-cols-2 gap-6">
-
+              <div className="grid gap-5 md:grid-cols-2">
                 {posts.map((post) => (
-
-                  <div
-                    key={post.id}
-                    className="bg-[#111827] border border-gray-800 rounded-xl p-5"
-                  >
-
-                    <span className="text-xs text-blue-400">
+                  <div key={post.id} className="panel space-y-3 rounded-xl p-5">
+                    <span className="inline-block rounded-full bg-[#eef2ff] px-3 py-1 text-xs text-[#4f5fcf]">
                       {post.themeTitle}
                     </span>
 
-                    <h3 className="text-white font-semibold mt-1">
-                      {post.title}
-                    </h3>
+                    <h3 className="text-lg font-semibold text-[#111827]">{post.title}</h3>
 
-                    <p className="text-gray-400 text-sm mt-2">
-                      {post.content}
-                    </p>
+                    {editingPostId === post.id ? (
+                      <div className="space-y-3">
+                        <textarea value={editPrompt} onChange={(e) => setEditPrompt(e.target.value)} className="input-field h-28" />
 
-                    <div className="flex gap-4 mt-4 text-sm">
+                        <div className="flex gap-2">
+                          <button onClick={updatePost} className="btn-primary px-3 py-2 text-sm">
+                            Save
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingPostId(null);
+                              setEditPrompt("");
+                            }}
+                            className="btn-secondary px-3 py-2 text-sm"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-[#4b5563]">{post.content}</p>
+                    )}
 
-                      <button
-                        onClick={() => setEditingPostId(post.id)}
-                        className="text-blue-400"
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        onClick={() => deletePost(post.id)}
-                        className="text-red-400"
-                      >
-                        Delete
-                      </button>
-
-                      <button
-                        onClick={() => regeneratePost(post.id)}
-                        className="text-purple-400"
-                      >
-                        Regenerate
-                      </button>
-
-                    </div>
-
+                    {editingPostId !== post.id && (
+                      <div className="flex gap-5 text-sm">
+                        <button
+                          onClick={() => {
+                            setEditingPostId(post.id);
+                            setEditPrompt(post.content);
+                          }}
+                          className="text-[#1b75d0]"
+                        >
+                          Edit
+                        </button>
+                        <button onClick={() => deletePost(post.id)} className="text-rose-600">
+                          Delete
+                        </button>
+                        <button onClick={() => regeneratePost(post.id)} className="text-[#4f5fcf]">
+                          Regenerate
+                        </button>
+                      </div>
+                    )}
                   </div>
-
                 ))}
-
               </div>
-
             )}
-            {posts.length > 0 && (
-              <div className="flex justify-center gap-4 mt-10">
 
-                {/* PREVIOUS BUTTON */}
+            {posts.length > 0 && (
+              <div className="mt-8 flex items-center justify-center gap-4">
                 <button
-                  disabled={currentPage === 1}
-                  onClick={() =>
-                    fetchPosts(
-                      selectedThemeFilter === "all" ? undefined : selectedThemeFilter,
-                      currentPage - 1
-                    )
-                  }
-                  className="px-4 py-2 bg-gray-700 text-white rounded disabled:opacity-40"
+                  disabled={postsPage === 1}
+                  onClick={() => fetchPosts(selectedThemeFilter === "all" ? undefined : selectedThemeFilter, postsPage - 1)}
+                  className="btn-secondary px-4 py-2 disabled:opacity-40"
                 >
                   Previous
                 </button>
 
-                {/* CURRENT PAGE */}
-                <span className="text-white px-4 py-2">
-                  Page {currentPage}
-                </span>
+                <span className="text-sm text-[#6b7280]">Page {postsPage}</span>
 
-                {/* NEXT BUTTON */}
                 <button
-                  disabled={!hasMore}
-                  onClick={() =>
-                    fetchPosts(
-                      selectedThemeFilter === "all" ? undefined : selectedThemeFilter,
-                      currentPage + 1
-                    )
-                  }
-                  className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-40"
+                  disabled={!postsHasMore}
+                  onClick={() => fetchPosts(selectedThemeFilter === "all" ? undefined : selectedThemeFilter, postsPage + 1)}
+                  className="btn-primary px-4 py-2 disabled:opacity-40"
                 >
                   Next
                 </button>
-
               </div>
             )}
-
           </div>
         )}
 
-        {/* ================= THEMES TAB ================= */}
-
         {activeTab === "themes" && (
-
-          <div className="space-y-6">
-
-            <div className="flex justify-end">
-
+          <div className="space-y-5">
+            <div className="flex justify-end gap-3">
               <button
-                onClick={() => setShowCustomForm(!showCustomForm)}
-                className="bg-gray-700 px-5 py-2 rounded text-white"
+                onClick={() => setShowCustomForm((prev) => !prev)}
+                className="btn-secondary px-5 py-2 text-sm"
               >
                 + Add Custom Theme
               </button>
-
             </div>
 
             {showCustomForm && (
-
-              <div className="bg-[#111827] border border-gray-700 rounded-xl p-6 space-y-4">
-
+              <div className="panel space-y-3 rounded-xl p-5">
                 <input
                   placeholder="Theme Title"
                   value={customTheme.title}
@@ -488,7 +401,7 @@ export default function CommunityDetailPage() {
                       title: e.target.value,
                     })
                   }
-                  className="w-full bg-[#0F172A] px-4 py-3 rounded text-white"
+                  className="input-field"
                 />
 
                 <textarea
@@ -500,144 +413,84 @@ export default function CommunityDetailPage() {
                       description: e.target.value,
                     })
                   }
-                  className="w-full bg-[#0F172A] px-4 py-3 rounded text-white"
+                  className="input-field"
                 />
 
-                <button
-                  onClick={addCustomTheme}
-                  className="bg-blue-600 px-6 py-2 rounded text-white"
-                >
+                <button onClick={addCustomTheme} className="btn-primary px-6 py-2.5">
                   Add Theme
                 </button>
-
               </div>
-
             )}
 
-            {themes.length === 0 && (
-
-              <div className="bg-[#111827] rounded-xl p-12 text-center border border-gray-800">
-
+            {themes.length === 0 && allThemes.length === 0 && (
+              <div className="panel rounded-xl p-12 text-center">
                 <button
                   onClick={generateThemes}
-                  className="bg-blue-600 px-6 py-3 rounded text-white"
+                  disabled={isGeneratingThemes}
+                  className="btn-primary px-6 py-3 disabled:opacity-60"
                 >
-                  Generate Themes
+                  {isGeneratingThemes ? "Generating..." : "Generate Themes"}
                 </button>
-
               </div>
+            )}
 
+            {themes.length === 0 && allThemes.length > 0 && (
+              <div className="panel rounded-xl p-12 text-center text-[#6b7280]">
+                No themes on this page.
+              </div>
             )}
 
             {themes.map((theme) => (
-
-              <div
-                key={theme.id}
-                className="bg-[#111827] border border-gray-800 rounded-xl p-5 flex justify-between"
-              >
-
+              <div key={theme.id} className="panel flex flex-col gap-4 rounded-xl p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-
-                  <h3 className="text-white font-semibold">
-                    {theme.title}
-                  </h3>
-
-                  <p className="text-gray-400 text-sm">
-                    {theme.description}
-                  </p>
-
+                  <h3 className="text-lg font-semibold text-[#111827]">{theme.title}</h3>
+                  <p className="text-sm text-[#6b7280]">{theme.description}</p>
                 </div>
 
-                <button
-                  onClick={() => generatePosts(theme)}
-                  className="bg-blue-600 px-4 py-2 rounded text-white text-sm"
-                >
+                <button onClick={() => generatePosts(theme)} className="btn-secondary px-4 py-2 text-sm font-medium text-[#4f5fcf]">
                   Generate Posts
                 </button>
-
               </div>
-
             ))}
+
             {themes.length > 0 && (
-
-              <div className="flex justify-center gap-4 mt-10">
-
+              <div className="mt-8 flex items-center justify-center gap-4">
                 <button
-                  disabled={currentPage === 1}
-                  onClick={() => fetchThemes(currentPage - 1)}
-                  className="px-4 py-2 bg-gray-700 text-white rounded disabled:opacity-40"
+                  disabled={themesPage === 1}
+                  onClick={() => fetchThemes(themesPage - 1)}
+                  className="btn-secondary px-4 py-2 disabled:opacity-40"
                 >
                   Previous
                 </button>
 
-                <span className="text-white px-4 py-2">
-                  Page {currentPage}
-                </span>
+                <span className="text-sm text-[#6b7280]">Page {themesPage}</span>
 
                 <button
-                  disabled={!hasMore}
-                  onClick={() => fetchThemes(currentPage + 1)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-40"
+                  disabled={!themesHasMore}
+                  onClick={() => fetchThemes(themesPage + 1)}
+                  className="btn-primary px-4 py-2 disabled:opacity-40"
                 >
                   Next
                 </button>
-
               </div>
-
             )}
-
           </div>
-
         )}
-
       </div>
 
-      {/* INVITE MODAL */}
-
       {showInvite && (
-
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center">
-
-          <div className="bg-[#111827] p-8 rounded-xl w-96">
-
-            <h2 className="text-lg mb-4 text-white">
-              Invite Member
-            </h2>
-
-            <input
-              type="email"
-              placeholder="Enter email"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              className="w-full p-2 rounded text-black mb-4"
-            />
-
-            <div className="flex justify-end gap-3">
-
-              <button
-                onClick={() => setShowInvite(false)}
-                className="px-4 py-2 bg-gray-600 rounded"
-              >
-                Cancel
-              </button>
-
-              <button
-                onClick={sendInvite}
-                disabled={inviteLoading}
-                className="px-4 py-2 bg-green-600 rounded"
-              >
-                {inviteLoading ? "Sending..." : "Send Invite"}
-              </button>
-
-            </div>
-
-          </div>
-
-        </div>
-
+        <InviteModal
+          communityId={id}
+          onClose={() => setShowInvite(false)}
+          onSuccess={() => {
+            setBannerType("success");
+            setBanner("Invite sent successfully.");
+          }}
+        />
       )}
-
     </div>
   );
 }
+
+
 

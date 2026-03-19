@@ -1,7 +1,10 @@
 import { db } from "../index.js";
 import { themes } from "../db/themes.schema";
 import { communityMembers } from "../db/communityMembers.schema";
+import { communities } from "../db/community.schema";
 import { eq, and, desc } from "drizzle-orm";
+import { getAggregatedContent } from "../apify/aggregator.js";
+import { generateAIThemes } from "../ai/theme.generator.js";
 
 /* =========================================================
    VERIFY COMMUNITY MEMBERSHIP
@@ -36,18 +39,64 @@ export async function generateThemes(
   communityId: string,
   userId: string
 ) {
+  const startedAt = Date.now();
+  console.info(`[themes.generate] started communityId=${communityId}`);
+
   await verifyCommunityMembership(communityId, userId);
+  console.info("[themes.generate] membership verified");
 
-  const aiThemes = [
-    { title: "Awareness Campaign", description: "Promote mission and values" },
-    { title: "Educational Content", description: "Share knowledge and insights" },
-    { title: "Events Promotion", description: "Boost engagement" },
-  ];
+  const existingThemes = await db
+    .select()
+    .from(themes)
+    .where(
+      and(
+        eq(themes.communityId, communityId),
+        eq(themes.source, "ai")
+      )
+    );
 
-  return await db
+  if (existingThemes.length > 0) {
+    throw new Error("Themes already generated for this community");
+  }
+  console.info("[themes.generate] existing AI themes check passed");
+
+  const [community] = await db
+    .select()
+    .from(communities)
+    .where(eq(communities.id, communityId));
+
+  if (!community) {
+    throw new Error("Community not found");
+  }
+  console.info("[themes.generate] community loaded");
+
+  const content = await getAggregatedContent({
+    websiteUrl: community.websiteUrl,
+    youtubeUrl: community.youtubeUrl,
+    twitterUrl: community.twitterUrl,
+  });
+  console.info("[themes.generate] content aggregation finished");
+
+  let aiThemes: { title: string; description: string }[] = [];
+
+  try {
+    aiThemes = await generateAIThemes(content);
+  } catch (err) {
+    console.error("AI parsing error:", err);
+    throw new Error("Failed to generate themes");
+  }
+  console.info(`[themes.generate] ai returned ${aiThemes.length} themes`);
+
+  if (!aiThemes || aiThemes.length === 0) {
+    throw new Error("No themes generated");
+  }
+
+  const limitedThemes = aiThemes.slice(0, 10);
+
+  const insertedThemes = await db
     .insert(themes)
     .values(
-      aiThemes.map(t => ({
+      limitedThemes.map((t) => ({
         communityId,
         title: t.title,
         description: t.description,
@@ -55,8 +104,13 @@ export async function generateThemes(
       }))
     )
     .returning();
-}
 
+  console.info(
+    `[themes.generate] completed inserted=${insertedThemes.length} durationMs=${Date.now() - startedAt}`
+  );
+
+  return insertedThemes;
+}
 /* =========================================================
    CREATE CUSTOM THEME
 ========================================================= */

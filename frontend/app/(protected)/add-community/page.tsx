@@ -25,11 +25,7 @@ export default function AddCommunityPage() {
     twitter: "",
   });
 
-  /* ---------------- INPUT CHANGE ---------------- */
-
-  const handleChange = (
-    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
 
     setForm((prev) => ({
@@ -37,8 +33,6 @@ export default function AddCommunityPage() {
       [name as keyof CommunityForm]: value,
     }));
   };
-
-  /* ---------------- SUBMIT ---------------- */
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -54,62 +48,54 @@ export default function AddCommunityPage() {
       });
 
       console.log("Created:", res.data);
-
+      window.dispatchEvent(new Event("community:created"));
+      window.dispatchEvent(new Event("community:changed"));
       router.push("/dashboard");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Create community error:", err);
 
-      alert(
-        err?.response?.data?.message ||
-        "Failed to create community. Please login again."
-      );
+      const message =
+        typeof err === "object" &&
+        err !== null &&
+        "response" in err &&
+        (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : "Failed to create community. Please login again.";
+
+      alert(message);
     } finally {
       setLoading(false);
     }
   };
 
-  /* ---------------- UI ---------------- */
-
   return (
-    <div className="bg-[#0B1120] min-h-screen flex items-center justify-center px-4 sm:px-6 py-14">
-      <div className="w-full max-w-3xl relative">
-
-        <div className="absolute inset-0 flex justify-center pointer-events-none">
-          <div className="w-[450px] h-[450px] bg-gradient-to-br from-blue-600/30 to-purple-600/20 rounded-full" />
+    <div className="bg-app-gradient min-h-screen flex items-center justify-center px-4 sm:px-6 py-14">
+      <div className="relative w-full max-w-3xl">
+        <div className="pointer-events-none absolute inset-0 flex justify-center">
+          <div className="h-[450px] w-[450px] rounded-full bg-gradient-to-br from-[#c7d2fe]/28 via-[#93c5fd]/18 to-transparent" />
         </div>
 
-        <div className="relative bg-[#111827] border border-gray-800 rounded-2xl p-6 sm:p-10 shadow-xl">
-
-          <h1 className="text-xl sm:text-2xl font-semibold text-white mb-2">
-            Add Community Details
-          </h1>
-
-          <p className="text-gray-400 text-sm mb-6">
+        <div className="panel relative rounded-2xl p-6 sm:p-10">
+          <h1 className="mb-2 text-xl font-semibold text-[#111827] sm:text-2xl">Add Community Details</h1>
+          <p className="mb-6 text-sm text-[#6b7280]">
             Provide information about your community to generate AI content.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-
-            {/* NAME */}
             <div>
-              <label className="block text-sm text-gray-400 mb-2">
-                Community Name
-              </label>
+              <label className="mb-2 block text-sm text-[#6b7280]">Community Name</label>
               <input
                 required
                 name="name"
                 value={form.name}
                 onChange={handleChange}
                 placeholder="e.g. ISKCON"
-                className="w-full bg-[#0F172A] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-600"
+                className="input-field"
               />
             </div>
 
-            {/* DESCRIPTION */}
             <div>
-              <label className="block text-sm text-gray-400 mb-2">
-                Description
-              </label>
+              <label className="mb-2 block text-sm text-[#6b7280]">Description</label>
               <textarea
                 required
                 rows={4}
@@ -117,30 +103,24 @@ export default function AddCommunityPage() {
                 value={form.description}
                 onChange={handleChange}
                 placeholder="Short description..."
-                className="w-full bg-[#0F172A] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-600"
+                className="input-field"
               />
             </div>
 
-            {/* WEBSITE */}
             <div>
-              <label className="block text-sm text-gray-400 mb-2">
-                Website URL
-              </label>
+              <label className="mb-2 block text-sm text-[#6b7280]">Website URL</label>
               <input
                 type="url"
                 name="website"
                 value={form.website}
                 onChange={handleChange}
                 placeholder="https://yourcommunity.com"
-                className="w-full bg-[#0F172A] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-600"
+                className="input-field"
               />
             </div>
 
-            {/* SOCIAL */}
             <div>
-              <label className="block text-sm text-gray-400 mb-2">
-                Social Presence
-              </label>
+              <label className="mb-2 block text-sm text-[#6b7280]">Social Presence</label>
 
               <input
                 type="url"
@@ -148,7 +128,7 @@ export default function AddCommunityPage() {
                 value={form.youtube}
                 onChange={handleChange}
                 placeholder="YouTube URL"
-                className="w-full mb-3 bg-[#0F172A] border border-gray-700 rounded-lg px-4 py-3 text-white"
+                className="input-field mb-3"
               />
 
               <input
@@ -157,36 +137,24 @@ export default function AddCommunityPage() {
                 value={form.twitter}
                 onChange={handleChange}
                 placeholder="Twitter URL"
-                className="w-full bg-[#0F172A] border border-gray-700 rounded-lg px-4 py-3 text-white"
+                className="input-field"
               />
             </div>
 
-            {/* BUTTONS */}
-            <div className="flex flex-col sm:flex-row gap-4 pt-4">
-
-              <button
-                type="button"
-                onClick={() => router.push("/dashboard")}
-                className="px-6 py-3 bg-gray-700 text-gray-300 rounded-lg w-full sm:w-auto"
-              >
+            <div className="flex flex-col gap-4 pt-4 sm:flex-row">
+              <button type="button" onClick={() => router.push("/dashboard")} className="btn-secondary w-full px-6 py-3 sm:w-auto">
                 Back
               </button>
 
-              <button
-                disabled={loading}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg w-full sm:w-auto"
-              >
+              <button disabled={loading} className="btn-primary w-full px-6 py-3 sm:w-auto">
                 {loading ? "Creating..." : "Create Community"}
               </button>
-
             </div>
-
           </form>
         </div>
       </div>
     </div>
   );
 }
-
 
 

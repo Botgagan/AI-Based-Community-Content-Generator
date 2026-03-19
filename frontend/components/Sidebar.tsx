@@ -1,12 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { url } from "@/lib/axiosInstance";
 
+type SidebarCommunity = {
+  id: string;
+  name: string;
+};
+
 export default function Sidebar() {
-  const [communities, setCommunities] = useState<any[]>([]);
+  const [communities, setCommunities] = useState<SidebarCommunity[]>([]);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     const load = async () => {
@@ -17,24 +23,35 @@ export default function Sidebar() {
         console.error(err);
       }
     };
+
+    const reloadCommunities = () => load();
+
     load();
-  }, []);
+    window.addEventListener("community:created", reloadCommunities);
+    window.addEventListener("community:changed", reloadCommunities);
+
+    return () => {
+      window.removeEventListener("community:created", reloadCommunities);
+      window.removeEventListener("community:changed", reloadCommunities);
+    };
+  }, [pathname]);
 
   return (
-    <aside className="w-64 bg-[#111827] border-r border-gray-800 hidden md:block">
-
-      <div className="p-4 border-b border-gray-800">
-        <h2 className="text-white font-semibold text-lg">
-          Communities
-        </h2>
+    <aside className="hidden h-full w-64 border-r border-[#e5e7eb] bg-[#ffffff]/80 backdrop-blur md:flex md:flex-col md:min-h-0">
+      <div className="border-b border-[#e5e7eb] p-4">
+        <h2 className="text-lg font-semibold text-[#1f2937]">Communities</h2>
       </div>
 
-      <div className="p-3 space-y-2">
+      <div className="flex-1 space-y-2 overflow-y-auto p-3">
         {communities.map((c) => (
           <button
             key={c.id}
             onClick={() => router.push(`/community/${c.id}`)}
-            className="w-full text-left px-3 py-2 rounded-lg text-gray-300 hover:bg-gray-800"
+            className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition ${
+              pathname === `/community/${c.id}`
+                ? "border-[#c7d2fe] bg-[#e8edff] text-[#4f5fcf]"
+                : "border-transparent text-[#4b5563] hover:border-[#e5e7eb] hover:bg-[#eef2ff]"
+            }`}
           >
             {c.name}
           </button>
@@ -43,3 +60,4 @@ export default function Sidebar() {
     </aside>
   );
 }
+

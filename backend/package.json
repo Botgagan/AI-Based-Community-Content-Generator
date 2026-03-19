@@ -4,7 +4,7 @@
   "description": "",
   "type": "module",
   "main": "index.js",
-   "scripts": {
+  "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "tsx watch src/index.ts",
     "db:generate": "drizzle-kit generate",
@@ -17,12 +17,14 @@
   "packageManager": "pnpm@10.29.2",
   "dependencies": {
     "@prisma/client": "^7.3.0",
+    "apify-client": "^2.22.2",
     "axios": "^1.13.5",
     "cors": "^2.8.6",
     "dotenv": "^17.2.4",
     "drizzle-orm": "^0.45.1",
     "express": "^5.2.1",
     "nodemailer": "^8.0.1",
+    "openai": "^6.32.0",
     "pg": "^8.18.0",
     "supertokens-node": "^24.0.1",
     "twilio": "^5.12.2"

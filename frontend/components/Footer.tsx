@@ -6,48 +6,35 @@ export default function Footer() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="bg-[#0B1120] border-t border-gray-800 text-gray-400 relative overflow-hidden">
+    <footer className="relative overflow-hidden border-t border-[#e5e7eb] bg-[#ffffff] text-[#6b7280]">
+      <div className="pointer-events-none absolute left-[-150px] top-[-200px] h-[500px] w-[500px] rounded-full bg-gradient-to-br from-[#c7d2fe]/30 to-[#93c5fd]/18" />
 
-      {/* glow */}
-      <div className="pointer-events-none absolute w-[500px] h-[500px] bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-full top-[-200px] left-[-150px]" />
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
-
-        <div className="flex flex-col md:flex-row justify-between items-center gap-8">
-
-          {/* BRAND */}
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+        <div className="flex flex-col items-center justify-between gap-8 md:flex-row">
           <div className="flex items-center gap-3 text-center md:text-left">
-            <div className="w-12 h-12 relative">
+            <div className="relative h-12 w-12">
               <Image src="/logo.png" alt="Hind Social Logo" fill className="object-contain" />
             </div>
 
             <div>
-              <p className="text-white font-semibold text-lg">Hind Social</p>
-              <p className="text-xs text-gray-500">AI Powered Community Platform</p>
+              <p className="text-lg font-semibold text-[#111827]">Hind Social</p>
+              <p className="text-xs text-[#9ca3af]">AI Powered Community Platform</p>
             </div>
           </div>
 
-          {/* COPYRIGHT */}
-          <div className="text-sm text-center">© {year} Hind Social. All rights reserved.</div>
+          <div className="text-center text-sm">Copyright {year} Hind Social. All rights reserved.</div>
 
-          {/* LINKS */}
           <div className="flex flex-wrap justify-center gap-6 text-sm">
-            <a href="#" className="hover:text-white transition">Privacy</a>
-            <a href="#" className="hover:text-white transition">Terms</a>
-            <a href="#" className="hover:text-white transition">Support</a>
+            <a href="#" className="transition hover:text-[#111827]">Privacy</a>
+            <a href="#" className="transition hover:text-[#111827]">Terms</a>
+            <a href="#" className="transition hover:text-[#111827]">Support</a>
           </div>
-
         </div>
 
-        {/* DIVIDER */}
-        <div className="h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent mt-10" />
-
+        <div className="mt-10 h-px bg-gradient-to-r from-transparent via-[#dbe3ff] to-transparent" />
       </div>
     </footer>
   );
 }
-
-
-
 
 

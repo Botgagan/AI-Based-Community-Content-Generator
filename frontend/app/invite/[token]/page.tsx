@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { url } from "@/lib/axiosInstance";
 import Session from "supertokens-auth-react/recipe/session";
@@ -32,8 +32,16 @@ export default function InvitePage() {
 
         // Step 4: Redirect to community
         router.replace(`/community/${res.data.communityId}`);
-      } catch (err: any) {
-        alert(err.response?.data?.message || "Invalid invite");
+      } catch (err: unknown) {
+        const message =
+          typeof err === "object" &&
+          err !== null &&
+          "response" in err &&
+          (err as { response?: { data?: { message?: string } } }).response?.data?.message
+            ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+            : "Invalid invite";
+
+        alert(message);
         router.replace("/");
       } finally {
         setLoading(false);
@@ -41,11 +49,13 @@ export default function InvitePage() {
     };
 
     processInvite();
-  }, [token]);
+  }, [token, router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center text-white">
+    <div className="bg-app-gradient min-h-screen flex items-center justify-center text-[#6b7280]">
       {loading ? "Processing invite..." : null}
     </div>
   );
 }
+
+
