@@ -1,41 +1,35 @@
 import { apifyClient } from "./apify.client";
 
-const DEFAULT_TWITTER_ACTOR_ID = "apidojo/tweet-scraper";
-const TWITTER_ACTOR_ID = process.env.APIFY_TWITTER_ACTOR_ID || DEFAULT_TWITTER_ACTOR_ID;
+const TWITTER_ACTOR_ID = process.env.APIFY_TWITTER_ACTOR_ID?.trim();
 const TWITTER_MAX_ITEMS = Number(process.env.APIFY_TWITTER_MAX_ITEMS);
 
-function isNotFoundError(error: unknown): boolean {
-  const e = error as { statusCode?: number; type?: string };
-  return e?.statusCode === 404 || e?.type === "record-not-found";
-}
-
-async function runTwitterActor(actorId: string, url: string) {
-  return apifyClient.actor(actorId).call({
-    startUrls: [{ url }],
-    maxTweets: TWITTER_MAX_ITEMS,
-    maxItems: TWITTER_MAX_ITEMS,
-    resultsLimit: TWITTER_MAX_ITEMS,
-  });
+function isTwitterUrl(value: string): boolean {
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return hostname === "x.com" || hostname.endsWith(".x.com") || hostname.endsWith("twitter.com");
+  } catch {
+    return false;
+  }
 }
 
 export async function scrapeTwitter(url: string) {
   if (!url) return [];
+  if (!TWITTER_ACTOR_ID) {
+    console.warn("Twitter scrape skipped: APIFY_TWITTER_ACTOR_ID is not configured.");
+    return [];
+  }
+  if (!isTwitterUrl(url)) {
+    console.warn(`Twitter scrape skipped: URL is not an X/Twitter URL (${url}).`);
+    return [];
+  }
 
   try {
-    let run;
-
-    try {
-      run = await runTwitterActor(TWITTER_ACTOR_ID, url);
-    } catch (error) {
-      if (!isNotFoundError(error) || TWITTER_ACTOR_ID === DEFAULT_TWITTER_ACTOR_ID) {
-        throw error;
-      }
-
-      console.warn(
-        `Twitter actor '${TWITTER_ACTOR_ID}' not found. Falling back to '${DEFAULT_TWITTER_ACTOR_ID}'.`
-      );
-      run = await runTwitterActor(DEFAULT_TWITTER_ACTOR_ID, url);
-    }
+    const run = await apifyClient.actor(TWITTER_ACTOR_ID).call({
+      startUrls: [{ url }],
+      maxTweets: TWITTER_MAX_ITEMS,
+      maxItems: TWITTER_MAX_ITEMS,
+      resultsLimit: TWITTER_MAX_ITEMS,
+    });
 
     if (!run.defaultDatasetId) return [];
 

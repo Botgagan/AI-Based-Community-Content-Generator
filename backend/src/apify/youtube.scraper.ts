@@ -1,40 +1,38 @@
 import { apifyClient } from "./apify.client";
 
-const DEFAULT_YOUTUBE_ACTOR_ID = "streamers/youtube-scraper";
-const YOUTUBE_ACTOR_ID = process.env.APIFY_YOUTUBE_ACTOR_ID || DEFAULT_YOUTUBE_ACTOR_ID;
+const YOUTUBE_ACTOR_ID = process.env.APIFY_YOUTUBE_ACTOR_ID?.trim();
 const YOUTUBE_MAX_ITEMS = Number(process.env.APIFY_YOUTUBE_MAX_ITEMS);
 
-function isNotFoundError(error: unknown): boolean {
-  const e = error as { statusCode?: number; type?: string };
-  return e?.statusCode === 404 || e?.type === "record-not-found";
-}
-
-async function runYoutubeActor(actorId: string, url: string) {
-  return apifyClient.actor(actorId).call({
-    startUrls: [{ url }],
-    maxResults: YOUTUBE_MAX_ITEMS,
-    maxItems: YOUTUBE_MAX_ITEMS,
-  });
+function isYouTubeUrl(value: string): boolean {
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return (
+      hostname === "youtu.be" ||
+      hostname.endsWith("youtube.com") ||
+      hostname.endsWith("youtube-nocookie.com")
+    );
+  } catch {
+    return false;
+  }
 }
 
 export async function scrapeYouTube(url: string) {
   if (!url) return [];
+  if (!YOUTUBE_ACTOR_ID) {
+    console.warn("YouTube scrape skipped: APIFY_YOUTUBE_ACTOR_ID is not configured.");
+    return [];
+  }
+  if (!isYouTubeUrl(url)) {
+    console.warn(`YouTube scrape skipped: URL is not a YouTube URL (${url}).`);
+    return [];
+  }
 
   try {
-    let run;
-
-    try {
-      run = await runYoutubeActor(YOUTUBE_ACTOR_ID, url);
-    } catch (error) {
-      if (!isNotFoundError(error) || YOUTUBE_ACTOR_ID === DEFAULT_YOUTUBE_ACTOR_ID) {
-        throw error;
-      }
-
-      console.warn(
-        `YouTube actor '${YOUTUBE_ACTOR_ID}' not found. Falling back to '${DEFAULT_YOUTUBE_ACTOR_ID}'.`
-      );
-      run = await runYoutubeActor(DEFAULT_YOUTUBE_ACTOR_ID, url);
-    }
+    const run = await apifyClient.actor(YOUTUBE_ACTOR_ID).call({
+      startUrls: [{ url }],
+      maxResults: YOUTUBE_MAX_ITEMS,
+      maxItems: YOUTUBE_MAX_ITEMS,
+    });
 
     if (!run.defaultDatasetId) return [];
 

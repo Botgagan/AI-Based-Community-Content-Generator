@@ -6,11 +6,13 @@ import Session from "supertokens-auth-react/recipe/session";
 import { ThirdPartyPreBuiltUI } from "supertokens-auth-react/recipe/thirdparty/prebuiltui";
 import { PasswordlessPreBuiltUI } from "supertokens-auth-react/recipe/passwordless/prebuiltui";
 import { canHandleRoute, getRoutingComponent } from "supertokens-auth-react/ui";
+import { initSuperTokens } from "@/lib/supertokens";
+
+initSuperTokens();
 
 export default function AuthPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

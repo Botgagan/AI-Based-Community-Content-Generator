@@ -8,17 +8,32 @@ export function formatScrapedData({
   twitter: any[];
 }) {
   const websiteText = website
-    .map((w) => `${w.title || ""} ${w.text || ""}`)
+    .map((w) => {
+      const title = w.title || "";
+      const text = w.text || w.markdown || w.description || w.content || "";
+      return `${title} ${text}`.trim();
+    })
+    .filter(Boolean)
     .join("\n")
     .slice(0, 2000);
 
   const youtubeText = youtube
-    .map((v) => `Title: ${v.title} | ${v.description || ""}`)
+    .map((v) => {
+      const title = v.title || v.name || "";
+      const description = v.description || v.text || v.fullText || v.full_text || "";
+      if (!title && !description) return "";
+      return `Title: ${title}${description ? ` | ${description}` : ""}`;
+    })
+    .filter(Boolean)
     .join("\n")
     .slice(0, 1500);
 
   const twitterText = twitter
-    .map((t) => `Tweet: ${t.text}`)
+    .map((t) => {
+      const text = t.text || t.fullText || t.full_text || t.description || "";
+      return text ? `Tweet: ${text}` : "";
+    })
+    .filter(Boolean)
     .join("\n")
     .slice(0, 1500);
 

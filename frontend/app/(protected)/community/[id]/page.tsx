@@ -16,6 +16,7 @@ type Theme = {
   id: string;
   title: string;
   description: string;
+  source?: "ai" | "custom";
 };
 
 type Post = {
@@ -58,6 +59,7 @@ export default function CommunityDetailPage() {
 
   const [postsPage, setPostsPage] = useState(1);
   const [postsHasMore, setPostsHasMore] = useState(true);
+  const hasAIThemes = allThemes.some((theme) => theme.source === "ai");
 
   const fetchThemes = async (page = 1) => {
     const [res, nextPageRes] = await Promise.all([
@@ -382,6 +384,16 @@ export default function CommunityDetailPage() {
         {activeTab === "themes" && (
           <div className="space-y-5">
             <div className="flex justify-end gap-3">
+              {!hasAIThemes && (
+                <button
+                  onClick={generateThemes}
+                  disabled={isGeneratingThemes}
+                  className="btn-primary px-5 py-2 text-sm disabled:opacity-60"
+                >
+                  {isGeneratingThemes ? "Generating..." : "Generate Themes"}
+                </button>
+              )}
+
               <button
                 onClick={() => setShowCustomForm((prev) => !prev)}
                 className="btn-secondary px-5 py-2 text-sm"
@@ -423,14 +435,8 @@ export default function CommunityDetailPage() {
             )}
 
             {themes.length === 0 && allThemes.length === 0 && (
-              <div className="panel rounded-xl p-12 text-center">
-                <button
-                  onClick={generateThemes}
-                  disabled={isGeneratingThemes}
-                  className="btn-primary px-6 py-3 disabled:opacity-60"
-                >
-                  {isGeneratingThemes ? "Generating..." : "Generate Themes"}
-                </button>
+              <div className="panel rounded-xl p-12 text-center text-[#6b7280]">
+                No themes yet. Generate AI themes or add a custom theme.
               </div>
             )}
 
@@ -491,6 +497,5 @@ export default function CommunityDetailPage() {
     </div>
   );
 }
-
 
 

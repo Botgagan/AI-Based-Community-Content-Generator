@@ -4,10 +4,11 @@ import Session from "supertokens-auth-react/recipe/session";
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
 
   const navLinks = [
@@ -17,7 +18,7 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     await Session.signOut();
-    window.location.href = "/auth";
+    router.replace("/auth");
   };
 
   return (

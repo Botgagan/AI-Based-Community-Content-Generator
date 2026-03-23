@@ -34,7 +34,7 @@ export default function Sidebar() {
       window.removeEventListener("community:created", reloadCommunities);
       window.removeEventListener("community:changed", reloadCommunities);
     };
-  }, [pathname]);
+  }, []);
 
   return (
     <aside className="hidden h-full w-64 border-r border-[#e5e7eb] bg-[#ffffff]/80 backdrop-blur md:flex md:flex-col md:min-h-0">
