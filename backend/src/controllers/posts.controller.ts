@@ -3,9 +3,9 @@ import type { SessionRequest } from "supertokens-node/framework/express";
 
 import {
   getPosts,
-  createPost,
   updatePost,
   deletePost,
+  generatePostsFromTheme,
   regeneratePost,
 } from "../services/posts.service.js";
 
@@ -42,39 +42,31 @@ export async function getPostsController(
 }
 
 /* =============================
-   CREATE POST
+   Generate POST
 ============================= */
 
-export async function createPostController(
+export async function generatePostsController(
   req: Request & SessionRequest,
   res: Response
 ) {
   try {
     const userId = await getPrimaryUserId(req);
+    const { themeId } = req.body;
 
-    const { themeId, title, content } = req.body;
-
-    if (!themeId || !title || !content) {
+    if (!themeId) {
       return res.status(400).json({
-        message: "Missing fields",
+        message: "themeId is required",
       });
     }
 
-    const post = await createPost(
-      {
-        themeId,
-        title,
-        content,
-      },
-      userId
-    );
+    const posts = await generatePostsFromTheme(themeId, userId);
 
-    res.status(201).json({
+    res.json({
       success: true,
-      post,
+      posts,
     });
   } catch (err: any) {
-    console.error("create post error:", err);
+    console.error("generate posts error:", err);
     res.status(400).json({ message: err.message });
   }
 }

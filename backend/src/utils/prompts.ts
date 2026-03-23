@@ -1,6 +1,3 @@
-/* =========================================================
-   THEME GENERATION PROMPT
-========================================================= */
 
 export const generateThemesPrompt = (content: string) => `
 You are an expert social media strategist.
@@ -35,3 +32,34 @@ Example:
   }
 ]
 `;
+
+export function generatePostsPrompt(input: {
+  title: string;
+  description: string;
+}) {
+  return `
+You are a professional social media content creator.
+
+Generate exactly 3 posts based on the given theme.
+
+Theme Title: ${input.title}
+Theme Description: ${input.description}
+
+Rules:
+- Return ONLY JSON array
+- Each post must include:
+  - title
+  - content (5–6 lines)
+- Add hashtags in LAST line
+- Professional + engaging tone
+- No explanations
+
+Format:
+[
+  {
+    "title": "Post title",
+    "content": "Line1\nLine2\nLine3\nLine4\nLine5\n#tag1 #tag2 #tag3"
+  }
+]
+`;
+}

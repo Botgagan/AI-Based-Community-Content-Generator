@@ -1,13 +1,13 @@
 import { db } from "../index.js";
-
 import { posts } from "../db/posts.schema.js";
 import { themes } from "../db/themes.schema.js";
-import { communities } from "../db/community.schema";
-import { communityMembers } from "../db/communityMembers.schema";
-
+import { communities } from "../db/community.schema.js";
+import { communityMembers } from "../db/communityMembers.schema.js";
 import { eq, and, desc } from "drizzle-orm";
-
 import { randomUUID } from "crypto";
+import { openai } from "../ai/llm.service.js";
+import { generatePostsPrompt } from "../utils/prompts.js";
+import { parsePostResponse } from "../utils/posts.parser.js";
 
 /* =============================
    GET POSTS
@@ -66,21 +66,17 @@ export async function getPosts({
 }
 
 /* =============================
-   CREATE POST
+   Generate POST
 ============================= */
 
-export async function createPost(
-  data: {
-    themeId: string;
-    title: string;
-    content: string;
-  },
+export async function generatePostsFromTheme(
+  themeId: string,
   userId: string
 ) {
   const [theme] = await db
     .select()
     .from(themes)
-    .where(eq(themes.id, data.themeId));
+    .where(eq(themes.id, themeId));
 
   if (!theme) throw new Error("Theme not found");
 
@@ -96,17 +92,37 @@ export async function createPost(
 
   if (!member.length) throw new Error("Not authorized");
 
-  const [post] = await db
+  const completion = await openai.chat.completions.create({
+    model: "google/gemini-2.5-flash",
+    temperature: 0.7,
+    messages: [
+      {
+        role: "user",
+        content: generatePostsPrompt({
+          title: theme.title,
+          description: theme.description,
+        }),
+      },
+    ],
+  });
+
+  const text = completion.choices[0]?.message?.content || "[]";
+
+  const parsedPosts = parsePostResponse(text);
+
+  const inserted = await db
     .insert(posts)
-    .values({
-      id: randomUUID(),
-      themeId: data.themeId,
-      title: data.title,
-      content: data.content,
-    })
+    .values(
+      parsedPosts.map((p) => ({
+        id: randomUUID(),
+        themeId: theme.id,
+        title: p.title,
+        content: p.content,
+      }))
+    )
     .returning();
 
-  return post;
+  return inserted;
 }
 
 /* =============================
@@ -193,11 +209,50 @@ export async function regeneratePost(id: string, userId: string) {
 
   if (!post) throw new Error("Post not found");
 
-  const newContent = post.content + " (Regenerated)";
+  const [theme] = await db
+    .select()
+    .from(themes)
+    .where(eq(themes.id, post.themeId));
+
+  if (!theme) throw new Error("Theme not found");
+
+  const member = await db
+    .select()
+    .from(communityMembers)
+    .where(
+      and(
+        eq(communityMembers.communityId, theme.communityId),
+        eq(communityMembers.userId, userId)
+      )
+    );
+
+  if (!member.length) throw new Error("Not authorized");
+
+  const completion = await openai.chat.completions.create({
+    model: "google/gemini-2.5-flash",
+    temperature: 0.9,
+    messages: [
+      {
+        role: "user",
+        content: generatePostsPrompt({
+          title: theme.title,
+          description: theme.description,
+        }),
+      },
+    ],
+  });
+
+  const text = completion.choices[0]?.message?.content || "[]";
+  const parsed = parsePostResponse(text);
+
+  const newPost = parsed[0];
 
   const [updated] = await db
     .update(posts)
-    .set({ content: newContent })
+    .set({
+      title: newPost.title,
+      content: newPost.content,
+    })
     .where(eq(posts.id, id))
     .returning();
 

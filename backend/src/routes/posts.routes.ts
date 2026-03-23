@@ -3,9 +3,9 @@ import { verifySession } from "../middleware/auth.js";
 
 import {
   getPostsController,
-  createPostController,
   updatePostController,
   deletePostController,
+  generatePostsController,
   regeneratePostController,
 } from "../controllers/posts.controller.js";
 
@@ -13,7 +13,7 @@ const router = Router();
 
 router.get("/",verifySession(), getPostsController);
 
-router.post("/create", verifySession(), createPostController);
+router.post("/generate", verifySession(), generatePostsController);
 
 router.put("/:id", verifySession(), updatePostController);
 
