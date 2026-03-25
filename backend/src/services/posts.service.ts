@@ -5,9 +5,7 @@ import { communities } from "../db/community.schema.js";
 import { communityMembers } from "../db/communityMembers.schema.js";
 import { eq, and, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { openai } from "../ai/llm.service.js";
-import { generatePostsPrompt } from "../utils/prompts.js";
-import { parsePostResponse } from "../utils/posts.parser.js";
+import { generateAIPosts } from "../ai/posts.generator.js";
 
 /* =============================
    GET POSTS
@@ -92,23 +90,11 @@ export async function generatePostsFromTheme(
 
   if (!member.length) throw new Error("Not authorized");
 
-  const completion = await openai.chat.completions.create({
-    model: "google/gemini-2.5-flash",
+  const parsedPosts = await generateAIPosts({
+    title: theme.title,
+    description: theme.description,
     temperature: 0.7,
-    messages: [
-      {
-        role: "user",
-        content: generatePostsPrompt({
-          title: theme.title,
-          description: theme.description,
-        }),
-      },
-    ],
   });
-
-  const text = completion.choices[0]?.message?.content || "[]";
-
-  const parsedPosts = parsePostResponse(text);
 
   const inserted = await db
     .insert(posts)
@@ -228,29 +214,17 @@ export async function regeneratePost(id: string, userId: string) {
 
   if (!member.length) throw new Error("Not authorized");
 
-  const completion = await openai.chat.completions.create({
-    model: "google/gemini-2.5-flash",
+  const parsed = await generateAIPosts({
+    title: theme.title,
+    description: theme.description,
     temperature: 0.9,
-    messages: [
-      {
-        role: "user",
-        content: generatePostsPrompt({
-          title: theme.title,
-          description: theme.description,
-        }),
-      },
-    ],
   });
-
-  const text = completion.choices[0]?.message?.content || "[]";
-  const parsed = parsePostResponse(text);
 
   const newPost = parsed[0];
 
   const [updated] = await db
     .update(posts)
     .set({
-      title: newPost.title,
       content: newPost.content,
     })
     .where(eq(posts.id, id))

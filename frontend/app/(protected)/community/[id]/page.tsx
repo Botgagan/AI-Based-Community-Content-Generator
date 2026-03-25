@@ -48,11 +48,14 @@ export default function CommunityDetailPage() {
 
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editPrompt, setEditPrompt] = useState("");
+  const [regeneratingPostId, setRegeneratingPostId] = useState<string | null>(null);
 
   const [showInvite, setShowInvite] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
   const [bannerType, setBannerType] = useState<"success" | "error">("success");
   const [isGeneratingThemes, setIsGeneratingThemes] = useState(false);
+  const [generatingPostsThemeId, setGeneratingPostsThemeId] = useState<string | null>(null);
+  const [generatingPostsThemeTitle, setGeneratingPostsThemeTitle] = useState<string | null>(null);
 
   const [themesPage, setThemesPage] = useState(1);
   const [themesHasMore, setThemesHasMore] = useState(true);
@@ -132,7 +135,7 @@ export default function CommunityDetailPage() {
       );
       await Promise.all([fetchThemes(1), fetchAllThemes()]);
       setBannerType("success");
-      setBanner("Themes generated successfully.");
+      setBanner("Themes generated successfully.");// remove banner and we will implement a toast notification.
     } catch (error) {
       const err = error as AxiosError<{ message?: string }>;
       const message =
@@ -164,29 +167,39 @@ export default function CommunityDetailPage() {
   };
 
   const generatePosts = async (theme: Theme) => {
-    const dummyPosts = [
-      {
-        title: `${theme.title} Awareness`,
-        content: `Learn how ${theme.title} can transform communities.`,
-      },
-      {
-        title: `${theme.title} Inspiration`,
-        content: `Be part of ${theme.title} and spread positivity.`,
-      },
-    ];
+    if (generatingPostsThemeId) return;
 
-    for (const p of dummyPosts) {
-      await url.post("/api/posts/create", {
-        themeId: theme.id,
-        title: p.title,
-        content: p.content,
-      });
-    }
-
-    await fetchPosts(selectedThemeFilter === "all" ? undefined : selectedThemeFilter, 1);
+    setGeneratingPostsThemeId(theme.id);
+    setGeneratingPostsThemeTitle(theme.title);
+    setBanner(null);
+    setSelectedThemeFilter(theme.id);
+    setPosts([]);
+    setPostsPage(1);
+    setPostsHasMore(false);
     setActiveTab("posts");
-    setBannerType("success");
-    setBanner("Posts generated for selected theme.");
+
+    try {
+      await url.post(
+        "/api/posts/generate",
+        { themeId: theme.id },
+        { timeout: 130000 }
+      );
+
+      await fetchPosts(theme.id, 1);
+      setBannerType("success");
+      setBanner(`AI posts generated for "${theme.title}".`);
+    } catch (error) {
+      const err = error as AxiosError<{ message?: string }>;
+      const message =
+        err.code === "ECONNABORTED"
+          ? "Post generation timed out. Please try again."
+          : err.response?.data?.message || "Failed to generate posts.";
+      setBannerType("error");
+      setBanner(message);
+    } finally {
+      setGeneratingPostsThemeId(null);
+      setGeneratingPostsThemeTitle(null);
+    }
   };
 
   const deletePost = async (postId: string) => {
@@ -195,21 +208,43 @@ export default function CommunityDetailPage() {
   };
 
   const regeneratePost = async (postId: string) => {
-    await url.patch(`/api/posts/${postId}/regenerate`);
-    await fetchPosts(selectedThemeFilter === "all" ? undefined : selectedThemeFilter, postsPage);
+    if (regeneratingPostId) return;
+
+    setRegeneratingPostId(postId);
+    try {
+      const res = await url.patch(`/api/posts/${postId}/regenerate`);
+      const updated = res.data?.post as { id?: string; title?: string; content?: string } | undefined;
+
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.id === postId
+            ? {
+                ...post,
+                title: updated?.title ?? post.title,
+                content: updated?.content ?? post.content,
+              }
+            : post
+        )
+      );
+    } finally {
+      setRegeneratingPostId(null);
+    }
   };
 
   const updatePost = async () => {
     if (!editingPostId) return;
 
-    await url.put(`/api/posts/${editingPostId}`, {
-      content: editPrompt,
-    });
+    const postId = editingPostId;
+    const newContent = editPrompt;
+
+    await url.put(`/api/posts/${postId}`, { content: newContent });
+
+    setPosts((prev) =>
+      prev.map((post) => (post.id === postId ? { ...post, content: newContent } : post))
+    );
 
     setEditingPostId(null);
     setEditPrompt("");
-
-    await fetchPosts(selectedThemeFilter === "all" ? undefined : selectedThemeFilter, postsPage);
   };
 
   if (!community) {
@@ -263,6 +298,12 @@ export default function CommunityDetailPage() {
 
         {activeTab === "posts" && (
           <div>
+            {generatingPostsThemeId && (
+              <div className="panel mb-4 rounded-xl p-4 text-sm text-[#4b5563]">
+                Generating posts for {generatingPostsThemeTitle || "selected theme"}... please wait.
+              </div>
+            )}
+
             {allThemes.length > 0 && (
               <div className="mb-6 flex justify-end">
                 <select
@@ -284,7 +325,7 @@ export default function CommunityDetailPage() {
               </div>
             )}
 
-            {posts.length === 0 && (
+            {posts.length === 0 && !generatingPostsThemeId && (
               <div className="panel rounded-xl p-12 text-center">
                 <p className="mb-5 text-[#6b7280]">
                   {selectedThemeFilter === "all"
@@ -347,8 +388,12 @@ export default function CommunityDetailPage() {
                         <button onClick={() => deletePost(post.id)} className="text-rose-600">
                           Delete
                         </button>
-                        <button onClick={() => regeneratePost(post.id)} className="text-[#4f5fcf]">
-                          Regenerate
+                        <button
+                          onClick={() => regeneratePost(post.id)}
+                          disabled={regeneratingPostId === post.id}
+                          className="text-[#4f5fcf] disabled:opacity-60"
+                        >
+                          {regeneratingPostId === post.id ? "Regenerating..." : "Regenerate"}
                         </button>
                       </div>
                     )}
@@ -453,8 +498,12 @@ export default function CommunityDetailPage() {
                   <p className="text-sm text-[#6b7280]">{theme.description}</p>
                 </div>
 
-                <button onClick={() => generatePosts(theme)} className="btn-secondary px-4 py-2 text-sm font-medium text-[#4f5fcf]">
-                  Generate Posts
+                <button
+                  onClick={() => generatePosts(theme)}
+                  disabled={generatingPostsThemeId === theme.id}
+                  className="btn-secondary px-4 py-2 text-sm font-medium text-[#4f5fcf] disabled:opacity-60"
+                >
+                  {generatingPostsThemeId === theme.id ? "Generating..." : "Generate Posts"}
                 </button>
               </div>
             ))}
@@ -497,5 +546,3 @@ export default function CommunityDetailPage() {
     </div>
   );
 }
-
-

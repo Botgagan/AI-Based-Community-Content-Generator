@@ -1,4 +1,3 @@
-
 export const generateThemesPrompt = (content: string) => `
 You are an expert social media strategist.
 
@@ -14,7 +13,7 @@ INSTRUCTIONS:
 - Generate exactly 10 themes
 - Each theme should be unique
 - Themes should be relevant to the content
-- Keep titles short (3–6 words)
+- Keep titles short (3-6 words)
 - Descriptions should be clear and engaging (1 sentence)
 
 STRICT OUTPUT FORMAT:
@@ -49,16 +48,17 @@ Rules:
 - Return ONLY JSON array
 - Each post must include:
   - title
-  - content (5–6 lines)
+  - content (5-6 lines)
 - Add hashtags in LAST line
 - Professional + engaging tone
 - No explanations
+- Use escaped newlines in content (\\n), not raw line breaks inside JSON strings
 
 Format:
 [
   {
     "title": "Post title",
-    "content": "Line1\nLine2\nLine3\nLine4\nLine5\n#tag1 #tag2 #tag3"
+    "content": "Line1\\nLine2\\nLine3\\nLine4\\nLine5\\n#tag1 #tag2 #tag3"
   }
 ]
 `;
