@@ -3,31 +3,37 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { url } from "@/lib/axiosInstance";
+import {
+  hasNextPageByLength,
+  PAGINATION_DEFAULT_LIMIT,
+  PAGINATION_DEFAULT_PAGE,
+} from "@/lib/pagination";
 
 type Community = {
   id: string;
   name: string;
   description: string;
+  imageUrl?: string | null;
 };
-
-const PAGE_SIZE = 10;
 
 export default function DashboardPage() {
   const router = useRouter();
   const [communities, setCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(PAGINATION_DEFAULT_PAGE);
   const [hasMore, setHasMore] = useState(true);
 
-  const fetchCommunities = useCallback(async (page = 1) => {
+  const fetchCommunities = useCallback(async (page = PAGINATION_DEFAULT_PAGE) => {
     try {
-      const res = await url.get(`/api/community/list?page=${page}`);
+      const res = await url.get(
+        `/api/community/list?page=${page}&limit=${PAGINATION_DEFAULT_LIMIT}`
+      );
       const data = res.data.communities || [];
 
       setCommunities(data);
       setCurrentPage(page);
-      setHasMore(data.length === PAGE_SIZE);
+      setHasMore(hasNextPageByLength(data.length, PAGINATION_DEFAULT_LIMIT));
     } catch (err: unknown) {
       if (typeof err === "object" && err !== null && "response" in err) {
         const response = (err as { response?: { status?: number } }).response;
@@ -107,6 +113,14 @@ export default function DashboardPage() {
                       Delete
                     </button>
                   </div>
+
+                  {community.imageUrl ? (
+                    <img
+                      src={community.imageUrl}
+                      alt={community.name}
+                      className="mb-3 h-36 w-full rounded-lg object-cover"
+                    />
+                  ) : null}
 
                   <h2 className="text-lg font-semibold text-[#111827]">{community.name}</h2>
                   <p className="mt-2 text-sm text-[#6b7280]">{community.description}</p>

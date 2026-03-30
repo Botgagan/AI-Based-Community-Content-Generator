@@ -10,6 +10,12 @@ import {
 } from "../services/posts.service.js";
 
 import { getPrimaryUserId } from "../utils/getPrimaryUserId.js";
+import {
+  PAGINATION_DEFAULT_LIMIT,
+  PAGINATION_DEFAULT_PAGE,
+  resolveLimit,
+  resolvePage,
+} from "../config/pagination.js";
 
 /* =============================
    GET POSTS
@@ -22,13 +28,14 @@ export async function getPostsController(
   try {
     const userId = await getPrimaryUserId(req);
 
-    const { themeId, communityId, page } = req.query;// Optional filters
+    const { themeId, communityId, page, limit } = req.query;// Optional filters
 
     const posts = await getPosts({
       userId,
       themeId: themeId as string | undefined,
       communityId: communityId as string | undefined,
-      page: Number(page) || 1,
+      page: resolvePage(page, PAGINATION_DEFAULT_PAGE),
+      limit: resolveLimit(limit, { fallback: PAGINATION_DEFAULT_LIMIT }),
     });
 
     res.json({

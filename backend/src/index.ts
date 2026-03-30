@@ -3,13 +3,14 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-import { middleware as supertokensMiddleware,errorHandler as supertokensErrorHandler} from "supertokens-node/framework/express";
+import { middleware as supertokensMiddleware, errorHandler as supertokensErrorHandler } from "supertokens-node/framework/express";
 import * as supertokensNode from "supertokens-node";
 import "./config/supertokens";
 import communityRoutes from "./routes/community.route.js";
 import themesRoutes from "./routes/themes.route.js";
 import inviteRoutes from "./routes/invite.route.js";
 import postsRoutes from "./routes/posts.routes.js";
+import { startImageWorker } from "./workers/image.worker.js";
 
 dotenv.config();
 
@@ -46,7 +47,7 @@ app.use(supertokensMiddleware());
 /* ---------------- TEST ROUTE ---------------- */
 
 app.get("/", (_, res) => {
-  res.send("Backend running 🚀");
+  res.send("Backend running");
 });
 
 /* ---------------- ERROR HANDLER ---------------- */
@@ -58,8 +59,6 @@ app.use(supertokensErrorHandler());
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
+  startImageWorker();
 });
-
-
-

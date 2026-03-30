@@ -5,6 +5,12 @@ import { communities } from "../db/community.schema";
 import { eq, and, desc } from "drizzle-orm";
 import { getAggregatedContent } from "../apify/aggregator.js";
 import { generateAIThemes } from "../ai/theme.generator.js";
+import { enqueueThemeImageJob } from "../queue/image.queue.js";
+import {
+  PAGINATION_DEFAULT_LIMIT,
+  PAGINATION_DEFAULT_PAGE,
+  resolveOffset,
+} from "../config/pagination.js";
 
 /* =========================================================
    VERIFY COMMUNITY MEMBERSHIP
@@ -100,6 +106,7 @@ export async function generateThemes(
         communityId,
         title: t.title,
         description: t.description,
+        scrapedContext: content,
         source: "ai",
       }))
     )
@@ -108,6 +115,10 @@ export async function generateThemes(
   console.info(
     `[themes.generate] completed inserted=${insertedThemes.length} durationMs=${Date.now() - startedAt}`
   );
+
+  for (const theme of insertedThemes) {
+    await enqueueThemeImageJob(theme.id);
+  }
 
   return insertedThemes;
 }
@@ -131,9 +142,12 @@ export async function createCustomTheme(
       communityId: data.communityId,
       title: data.title,
       description: data.description,
+      scrapedContext: "",
       source: "custom",
     })
     .returning();
+
+  await enqueueThemeImageJob(theme.id);
 
   return theme;
 }
@@ -145,8 +159,8 @@ export async function createCustomTheme(
 export async function getThemesByCommunity({
   communityId,
   userId,
-  page = 1,
-  limit = 10,
+  page = PAGINATION_DEFAULT_PAGE,
+  limit = PAGINATION_DEFAULT_LIMIT,
 }: {
   communityId: string;
   userId: string;
@@ -156,7 +170,7 @@ export async function getThemesByCommunity({
 
   await verifyCommunityMembership(communityId, userId);
 
-  const offset = (page - 1) * limit;
+  const offset = resolveOffset(page, limit);
 
   return db
     .select()

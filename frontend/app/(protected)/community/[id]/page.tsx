@@ -5,17 +5,25 @@ import { useEffect, useState } from "react";
 import { url } from "@/lib/axiosInstance";
 import InviteModal from "@/components/InviteModal";
 import { AxiosError } from "axios";
+import {
+  hasNextPageByLength,
+  PAGINATION_DEFAULT_LIMIT,
+  PAGINATION_DEFAULT_PAGE,
+  THEMES_ALL_FETCH_LIMIT,
+} from "@/lib/pagination";
 
 type Community = {
   id: string;
   name: string;
   description: string;
+  imageUrl?: string | null;
 };
 
 type Theme = {
   id: string;
   title: string;
   description: string;
+  imageUrl?: string | null;
   source?: "ai" | "custom";
 };
 
@@ -23,11 +31,10 @@ type Post = {
   id: string;
   title: string;
   content: string;
+  imageUrl?: string | null;
   themeId: string;
   themeTitle: string;
 };
-
-const PAGE_SIZE = 10;
 
 export default function CommunityDetailPage() {
   const { id } = useParams() as { id: string };
@@ -57,17 +64,21 @@ export default function CommunityDetailPage() {
   const [generatingPostsThemeId, setGeneratingPostsThemeId] = useState<string | null>(null);
   const [generatingPostsThemeTitle, setGeneratingPostsThemeTitle] = useState<string | null>(null);
 
-  const [themesPage, setThemesPage] = useState(1);
+  const [themesPage, setThemesPage] = useState(PAGINATION_DEFAULT_PAGE);
   const [themesHasMore, setThemesHasMore] = useState(true);
 
-  const [postsPage, setPostsPage] = useState(1);
+  const [postsPage, setPostsPage] = useState(PAGINATION_DEFAULT_PAGE);
   const [postsHasMore, setPostsHasMore] = useState(true);
   const hasAIThemes = allThemes.some((theme) => theme.source === "ai");
 
-  const fetchThemes = async (page = 1) => {
+  const fetchThemes = async (page = PAGINATION_DEFAULT_PAGE) => {
     const [res, nextPageRes] = await Promise.all([
-      url.get(`/api/themes?communityId=${id}&page=${page}&limit=${PAGE_SIZE}`),
-      url.get(`/api/themes?communityId=${id}&page=${page + 1}&limit=${PAGE_SIZE}`),
+      url.get(
+        `/api/themes?communityId=${id}&page=${page}&limit=${PAGINATION_DEFAULT_LIMIT}`
+      ),
+      url.get(
+        `/api/themes?communityId=${id}&page=${page + 1}&limit=${PAGINATION_DEFAULT_LIMIT}`
+      ),
     ]);
     const data = res.data.themes || [];
     const nextPageData = nextPageRes.data.themes || [];
@@ -78,29 +89,39 @@ export default function CommunityDetailPage() {
   };
 
   const fetchAllThemes = async () => {
-    const res = await url.get(`/api/themes?communityId=${id}&limit=1000`);
+    const res = await url.get(
+      `/api/themes?communityId=${id}&limit=${THEMES_ALL_FETCH_LIMIT}`
+    );
     setAllThemes(res.data.themes || []);
   };
 
-  const fetchPosts = async (themeId?: string, page = 1) => {
-    const query = themeId ? `?themeId=${themeId}&page=${page}` : `?communityId=${id}&page=${page}`;
+  const fetchPosts = async (themeId?: string, page = PAGINATION_DEFAULT_PAGE) => {
+    const query = themeId
+      ? `?themeId=${themeId}&page=${page}&limit=${PAGINATION_DEFAULT_LIMIT}`
+      : `?communityId=${id}&page=${page}&limit=${PAGINATION_DEFAULT_LIMIT}`;
 
     const res = await url.get(`/api/posts${query}`);
     const data = res.data.posts || [];
 
     setPosts(data);
     setPostsPage(page);
-    setPostsHasMore(data.length === PAGE_SIZE);
+    setPostsHasMore(hasNextPageByLength(data.length, PAGINATION_DEFAULT_LIMIT));
   };
 
   useEffect(() => {
     const init = async () => {
       const [communityRes, themesRes, nextThemesRes, postsRes, allThemesRes] = await Promise.all([
         url.get(`/api/community/${id}`),
-        url.get(`/api/themes?communityId=${id}&page=1&limit=${PAGE_SIZE}`),
-        url.get(`/api/themes?communityId=${id}&page=2&limit=${PAGE_SIZE}`),
-        url.get(`/api/posts?communityId=${id}&page=1`),
-        url.get(`/api/themes?communityId=${id}&limit=1000`),
+        url.get(
+          `/api/themes?communityId=${id}&page=${PAGINATION_DEFAULT_PAGE}&limit=${PAGINATION_DEFAULT_LIMIT}`
+        ),
+        url.get(
+          `/api/themes?communityId=${id}&page=${PAGINATION_DEFAULT_PAGE + 1}&limit=${PAGINATION_DEFAULT_LIMIT}`
+        ),
+        url.get(
+          `/api/posts?communityId=${id}&page=${PAGINATION_DEFAULT_PAGE}&limit=${PAGINATION_DEFAULT_LIMIT}`
+        ),
+        url.get(`/api/themes?communityId=${id}&limit=${THEMES_ALL_FETCH_LIMIT}`),
       ]);
 
       const initialThemes = themesRes.data.themes || [];
@@ -109,16 +130,34 @@ export default function CommunityDetailPage() {
 
       setCommunity(communityRes.data.community);
       setThemes(initialThemes);
-      setThemesPage(1);
+      setThemesPage(PAGINATION_DEFAULT_PAGE);
       setThemesHasMore(nextThemes.length > 0);
       setPosts(initialPosts);
-      setPostsPage(1);
-      setPostsHasMore(initialPosts.length === PAGE_SIZE);
+      setPostsPage(PAGINATION_DEFAULT_PAGE);
+      setPostsHasMore(hasNextPageByLength(initialPosts.length, PAGINATION_DEFAULT_LIMIT));
       setAllThemes(allThemesRes.data.themes || []);
     };
 
     init();
   }, [id]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (activeTab === "themes" && themes.some((theme) => !theme.imageUrl)) {
+        fetchThemes(themesPage).catch((error) => {
+          console.error("Failed to refresh themes", error);
+        });
+      }
+
+      if (activeTab === "posts" && posts.some((post) => !post.imageUrl)) {
+        fetchPosts(selectedThemeFilter === "all" ? undefined : selectedThemeFilter, postsPage).catch((error) => {
+          console.error("Failed to refresh posts", error);
+        });
+      }
+    }, 8000);
+
+    return () => clearInterval(timer);
+  }, [activeTab, posts, postsPage, selectedThemeFilter, themes, themesPage]);
 
   const generateThemes = async () => {
     if (isGeneratingThemes) return;
@@ -174,7 +213,7 @@ export default function CommunityDetailPage() {
     setBanner(null);
     setSelectedThemeFilter(theme.id);
     setPosts([]);
-    setPostsPage(1);
+    setPostsPage(PAGINATION_DEFAULT_PAGE);
     setPostsHasMore(false);
     setActiveTab("posts");
 
@@ -260,6 +299,13 @@ export default function CommunityDetailPage() {
       <div className="mx-auto max-w-6xl">
         <div className="panel mb-6 flex flex-col gap-4 rounded-2xl p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
+            {community.imageUrl ? (
+              <img
+                src={community.imageUrl}
+                alt={community.name}
+                className="mb-3 h-40 w-full max-w-xl rounded-xl object-cover"
+              />
+            ) : null}
             <h1 className="text-2xl font-semibold text-[#111827]">{community.name}</h1>
             <p className="mt-1 text-sm text-[#6b7280]">{community.description}</p>
           </div>
@@ -350,6 +396,18 @@ export default function CommunityDetailPage() {
                     </span>
 
                     <h3 className="text-lg font-semibold text-[#111827]">{post.title}</h3>
+
+                    {post.imageUrl ? (
+                      <img
+                        src={post.imageUrl}
+                        alt={post.title}
+                        className="h-52 w-full rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="rounded-lg border border-dashed border-[#d1d5db] bg-white/50 px-3 py-4 text-xs text-[#6b7280]">
+                        Image generating...
+                      </div>
+                    )}
 
                     {editingPostId === post.id ? (
                       <div className="space-y-3">
@@ -494,6 +552,17 @@ export default function CommunityDetailPage() {
             {themes.map((theme) => (
               <div key={theme.id} className="panel flex flex-col gap-4 rounded-xl p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
+                  {theme.imageUrl ? (
+                    <img
+                      src={theme.imageUrl}
+                      alt={theme.title}
+                      className="mb-3 h-36 w-full max-w-lg rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="mb-3 rounded-lg border border-dashed border-[#d1d5db] bg-white/50 px-3 py-4 text-xs text-[#6b7280]">
+                      Theme image generating...
+                    </div>
+                  )}
                   <h3 className="text-lg font-semibold text-[#111827]">{theme.title}</h3>
                   <p className="text-sm text-[#6b7280]">{theme.description}</p>
                 </div>

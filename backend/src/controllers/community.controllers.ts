@@ -9,9 +9,15 @@ import {
   updateCommunity,
   deleteCommunity,
   leaveCommunity,
-} from "../services/community.service";
+} from "../services/community.service.js";
 
 import { getPrimaryUserId } from "../utils/getPrimaryUserId.js";
+import {
+  PAGINATION_DEFAULT_LIMIT,
+  PAGINATION_DEFAULT_PAGE,
+  resolveLimit,
+  resolvePage,
+} from "../config/pagination.js";
 
 /* CREATE */
 export async function createCommunityController(
@@ -21,7 +27,7 @@ export async function createCommunityController(
   try {
     const userId = await getPrimaryUserId(req);
 
-    const { name, description, websiteUrl, youtubeUrl, twitterUrl } = req.body;
+    const { name, description, websiteUrl, youtubeUrl, twitterUrl, imageUrl } = req.body;
 
     const community = await createCommunity(
       {
@@ -31,6 +37,7 @@ export async function createCommunityController(
         websiteUrl,
         youtubeUrl,
         twitterUrl,
+        imageUrl,
       },
       userId
     );
@@ -55,8 +62,8 @@ export async function getCommunitiesController(
 
     const communities = await getUserCommunities({
       userId,
-      page: Number(page) || 1,
-      limit: Number(limit) || 10,
+      page: resolvePage(page, PAGINATION_DEFAULT_PAGE),
+      limit: resolveLimit(limit, { fallback: PAGINATION_DEFAULT_LIMIT }),
       all: all === "true",
     });
 

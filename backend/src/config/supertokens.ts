@@ -126,13 +126,13 @@ SuperTokens.init({
   framework: "express",
 
   supertokens: {
-    connectionURI: "http://localhost:3567",
+    connectionURI: process.env.SUPERTOKENS_CONNECTION_URI || "http://localhost:3567",
   },
 
   appInfo: {
     appName: "AI Community Platform",
-    apiDomain: "http://localhost:5000",
-    websiteDomain: "http://localhost:3000",
+    apiDomain: process.env.API_DOMAIN || "http://localhost:5000",
+    websiteDomain: process.env.WEBSITE_DOMAIN || "http://localhost:3000",
     apiBasePath: "/auth",
     websiteBasePath: "/auth",
   },

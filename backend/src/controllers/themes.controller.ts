@@ -9,6 +9,12 @@ import {
 } from "../services/themes.service.js";
 
 import { getPrimaryUserId } from "../utils/getPrimaryUserId.js";
+import {
+  PAGINATION_DEFAULT_LIMIT,
+  PAGINATION_DEFAULT_PAGE,
+  resolveLimit,
+  resolvePage,
+} from "../config/pagination.js";
 
 /* =======================================================
    GENERATE THEMES
@@ -83,8 +89,10 @@ export async function getThemesController(
 
     const { communityId } = req.query;
 
-    const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 10;
+    const page = resolvePage(req.query.page, PAGINATION_DEFAULT_PAGE);
+    const limit = resolveLimit(req.query.limit, {
+      fallback: PAGINATION_DEFAULT_LIMIT,
+    });
 
     if (!communityId) {
       return res.status(400).json({ message: "communityId required" });

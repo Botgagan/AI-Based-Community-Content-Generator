@@ -3,7 +3,11 @@ import { scrapeYouTube } from "./youtube.scraper";
 import { scrapeTwitter } from "./twitter.scraper";
 import { formatScrapedData } from "./formatter";
 
-const SCRAPER_TIMEOUT_MS = Number(process.env.APIFY_SCRAPER_TIMEOUT_MS);
+const rawScraperTimeout = Number(process.env.APIFY_SCRAPER_TIMEOUT_MS);
+const SCRAPER_TIMEOUT_MS =
+  Number.isFinite(rawScraperTimeout) && rawScraperTimeout > 0
+    ? rawScraperTimeout
+    : 60000;
 const ENABLE_SCRAPER_DEBUG_LOGS = process.env.ENABLE_SCRAPER_DEBUG_LOGS !== "false";
 const SCRAPER_PREVIEW_ITEMS = Number(process.env.SCRAPER_PREVIEW_ITEMS || 5);
 const SCRAPER_PREVIEW_TEXT_LENGTH = Number(process.env.SCRAPER_PREVIEW_TEXT_LENGTH || 120);

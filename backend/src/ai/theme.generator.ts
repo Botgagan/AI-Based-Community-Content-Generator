@@ -1,5 +1,5 @@
-import { openai } from "./llm.service";
-import { generateThemesPrompt } from "../utils/prompts";
+import { openai } from "./llm.service.js";
+import { generateThemesPrompt } from "../utils/prompts.js";
 
 type GeneratedTheme = {
   title: string;

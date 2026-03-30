@@ -88,8 +88,12 @@ async function scrapeWebsiteViaHttp(url: string) {
 
 export async function scrapeWebsite(url: string) {
   if (!url) return [];
-  if (!WEBSITE_ACTOR_ID) return [];
   if (!isHttpUrl(url)) return [];
+
+  if (!WEBSITE_ACTOR_ID) {
+    console.warn("Website actor not configured, using HTTP fallback.");
+    return await scrapeWebsiteViaHttp(url);
+  }
 
   try {
     const proxyConfiguration = APIFY_USE_PROXY

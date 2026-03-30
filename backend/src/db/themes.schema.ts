@@ -14,6 +14,7 @@ export const themes = pgTable(
 
     title: text("title").notNull(),
     description: text("description").notNull(),
+    scrapedContext: text("scraped_context"),
 
     imageUrl: text("image_url"),
 

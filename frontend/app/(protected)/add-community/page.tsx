@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { url } from "@/lib/axiosInstance";
+import { uploadImageToCloudinary } from "@/lib/cloudinaryUpload";
 
 type CommunityForm = {
   name: string;
@@ -16,6 +17,8 @@ type CommunityForm = {
 export default function AddCommunityPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
 
   const [form, setForm] = useState<CommunityForm>({
     name: "",
@@ -34,17 +37,32 @@ export default function AddCommunityPage() {
     }));
   };
 
+  const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      let imageUrl: string | undefined;
+
+      if (imageFile) {
+        imageUrl = await uploadImageToCloudinary(imageFile, "communities");
+      }
+
       const res = await url.post("/api/community/create", {
         name: form.name,
         description: form.description,
         websiteUrl: form.website,
         youtubeUrl: form.youtube,
         twitterUrl: form.twitter,
+        imageUrl,
       });
 
       console.log("Created:", res.data);
@@ -105,6 +123,23 @@ export default function AddCommunityPage() {
                 placeholder="Short description..."
                 className="input-field"
               />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm text-[#6b7280]">Community Image</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="input-field"
+              />
+              {imagePreview && (
+                <img
+                  src={imagePreview}
+                  alt="Community preview"
+                  className="mt-3 h-40 w-full rounded-lg object-cover"
+                />
+              )}
             </div>
 
             <div>

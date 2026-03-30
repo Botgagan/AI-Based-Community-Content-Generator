@@ -6,6 +6,12 @@ import { communityMembers } from "../db/communityMembers.schema.js";
 import { eq, and, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { generateAIPosts } from "../ai/posts.generator.js";
+import { enqueuePostImageJob } from "../queue/image.queue.js";
+import {
+  PAGINATION_DEFAULT_LIMIT,
+  PAGINATION_DEFAULT_PAGE,
+  resolveOffset,
+} from "../config/pagination.js";
 
 /* =============================
    GET POSTS
@@ -15,16 +21,17 @@ export async function getPosts({
   userId,
   themeId,
   communityId,
-  page = 1,
+  page = PAGINATION_DEFAULT_PAGE,
+  limit = PAGINATION_DEFAULT_LIMIT,
 }: {
   userId: string;
   themeId?: string;
   communityId?: string;
   page?: number;
+  limit?: number;
 }) {
 
-   const limit = 10;
-   const offset = (page -1) * limit;
+   const offset = resolveOffset(page, limit);
 
   const conditions = [
     eq(communityMembers.userId, userId),
@@ -43,6 +50,7 @@ export async function getPosts({
       id: posts.id,
       title: posts.title,
       content: posts.content,
+      imageUrl: posts.imageUrl,
       themeId: posts.themeId,
       themeTitle: themes.title,
       communityId: themes.communityId,
@@ -67,6 +75,24 @@ export async function getPosts({
    Generate POST
 ============================= */
 
+async function getCommunityPromptContext(
+  communityId: string,
+  scrapedContext?: string | null
+) {
+  const [community] = await db
+    .select()
+    .from(communities)
+    .where(eq(communities.id, communityId));
+
+  if (!community) throw new Error("Community not found");
+
+  return {
+    communityName: community.name,
+    communityDescription: community.description,
+    scrapedContext: scrapedContext || "",
+  };
+}
+
 export async function generatePostsFromTheme(
   themeId: string,
   userId: string
@@ -90,9 +116,17 @@ export async function generatePostsFromTheme(
 
   if (!member.length) throw new Error("Not authorized");
 
+  const context = await getCommunityPromptContext(
+    theme.communityId,
+    theme.scrapedContext
+  );
+
   const parsedPosts = await generateAIPosts({
     title: theme.title,
     description: theme.description,
+    communityName: context.communityName,
+    communityDescription: context.communityDescription,
+    scrapedContext: context.scrapedContext,
     temperature: 0.7,
   });
 
@@ -107,6 +141,10 @@ export async function generatePostsFromTheme(
       }))
     )
     .returning();
+
+  for (const post of inserted) {
+    await enqueuePostImageJob(post.id);
+  }
 
   return inserted;
 }
@@ -214,9 +252,17 @@ export async function regeneratePost(id: string, userId: string) {
 
   if (!member.length) throw new Error("Not authorized");
 
+  const context = await getCommunityPromptContext(
+    theme.communityId,
+    theme.scrapedContext
+  );
+
   const parsed = await generateAIPosts({
     title: theme.title,
     description: theme.description,
+    communityName: context.communityName,
+    communityDescription: context.communityDescription,
+    scrapedContext: context.scrapedContext,
     temperature: 0.9,
   });
 
@@ -226,9 +272,12 @@ export async function regeneratePost(id: string, userId: string) {
     .update(posts)
     .set({
       content: newPost.content,
+      imageUrl: null,
     })
     .where(eq(posts.id, id))
     .returning();
+
+  await enqueuePostImageJob(updated.id);
 
   return updated;
 }

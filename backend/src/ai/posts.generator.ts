@@ -5,6 +5,9 @@ import { parsePostResponse } from "../utils/posts.parser.js";
 type GeneratePostsInput = {
   title: string;
   description: string;
+  communityName?: string;
+  communityDescription?: string;
+  scrapedContext?: string;
   temperature?: number;
 };
 
@@ -18,6 +21,9 @@ export async function generateAIPosts(input: GeneratePostsInput) {
         content: generatePostsPrompt({
           title: input.title,
           description: input.description,
+          communityName: input.communityName,
+          communityDescription: input.communityDescription,
+          scrapedContext: input.scrapedContext,
         }),
       },
     ],

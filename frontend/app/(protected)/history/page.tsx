@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { url } from "@/lib/axiosInstance";
+import {
+  hasNextPageByLength,
+  PAGINATION_DEFAULT_LIMIT,
+  PAGINATION_DEFAULT_PAGE,
+} from "@/lib/pagination";
 
 type Community = {
   id: string;
@@ -13,20 +18,19 @@ type Post = {
   id: string;
   title: string;
   content: string;
+  imageUrl?: string | null;
   themeId: string;
   themeTitle: string;
   communityId: string;
   communityName: string;
 };
 
-const PAGE_SIZE = 10;
-
 export default function HistoryPage() {
   const [communities, setCommunities] = useState<Community[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [selectedCommunity, setSelectedCommunity] = useState("all");
 
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(PAGINATION_DEFAULT_PAGE);
   const [hasMore, setHasMore] = useState(true);
 
   const fetchCommunities = async () => {
@@ -38,15 +42,17 @@ export default function HistoryPage() {
     }
   };
 
-  const fetchPosts = async (communityId?: string, page = 1) => {
+  const fetchPosts = async (communityId?: string, page = PAGINATION_DEFAULT_PAGE) => {
     try {
-      const query = communityId ? `?communityId=${communityId}&page=${page}` : `?page=${page}`;
+      const query = communityId
+        ? `?communityId=${communityId}&page=${page}&limit=${PAGINATION_DEFAULT_LIMIT}`
+        : `?page=${page}&limit=${PAGINATION_DEFAULT_LIMIT}`;
       const res = await url.get(`/api/posts${query}`);
       const data = res.data.posts || [];
 
       setPosts(data);
       setCurrentPage(page);
-      setHasMore(data.length === PAGE_SIZE);
+      setHasMore(hasNextPageByLength(data.length, PAGINATION_DEFAULT_LIMIT));
     } catch (err) {
       console.error("Failed to load posts", err);
     }
@@ -107,6 +113,13 @@ export default function HistoryPage() {
                     {post.communityName}
                   </span>
                   <h3 className="text-base font-semibold text-[#111827]">{post.title}</h3>
+                  {post.imageUrl ? (
+                    <img
+                      src={post.imageUrl}
+                      alt={post.title}
+                      className="h-44 w-full rounded-lg object-cover"
+                    />
+                  ) : null}
                   <p className="text-xs text-[#4f5fcf]">{post.themeTitle}</p>
                   <p className="text-sm text-[#4b5563]">{post.content}</p>
                 </div>

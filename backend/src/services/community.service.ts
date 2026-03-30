@@ -3,6 +3,11 @@ import { communities } from "../db/community.schema.js";
 import { communityMembers } from "../db/communityMembers.schema.js";
 import { eq, and, desc} from "drizzle-orm";
 import { randomUUID } from "crypto";
+import {
+  PAGINATION_DEFAULT_LIMIT,
+  PAGINATION_DEFAULT_PAGE,
+  resolveOffset,
+} from "../config/pagination.js";
 
 /* CREATE COMMUNITY */
 
@@ -16,6 +21,7 @@ export async function createCommunity(data: any, userId: string) {
       websiteUrl: data.websiteUrl,
       youtubeUrl: data.youtubeUrl,
       twitterUrl: data.twitterUrl,
+      imageUrl: data.imageUrl,
     })
     .returning();
 
@@ -34,8 +40,8 @@ export async function createCommunity(data: any, userId: string) {
 
 export async function getUserCommunities({
   userId,
-  page = 1,
-  limit = 10,
+  page = PAGINATION_DEFAULT_PAGE,
+  limit = PAGINATION_DEFAULT_LIMIT,
   all = false,
 }: {
   userId: string
@@ -49,6 +55,7 @@ export async function getUserCommunities({
       id: communities.id,
       name: communities.name,
       description: communities.description,
+      imageUrl: communities.imageUrl,
       createdAt: communities.createdAt,
     })
     .from(communityMembers)
@@ -63,7 +70,7 @@ export async function getUserCommunities({
     return baseQuery;
   }
 
-  const offset = (page - 1) * limit;
+  const offset = resolveOffset(page, limit);
 
   return baseQuery.limit(limit).offset(offset);
 }
@@ -79,6 +86,7 @@ export async function getCommunityById(id: string, userId: string) {
       websiteUrl: communities.websiteUrl,
       youtubeUrl: communities.youtubeUrl,
       twitterUrl: communities.twitterUrl,
+      imageUrl: communities.imageUrl,
       createdAt: communities.createdAt,
     })
     .from(communityMembers)
