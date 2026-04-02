@@ -5,7 +5,6 @@ import { communities } from "../db/community.schema";
 import { eq, and, desc } from "drizzle-orm";
 import { getAggregatedContent } from "../apify/aggregator.js";
 import { generateAIThemes } from "../ai/theme.generator.js";
-import { enqueueThemeImageJob } from "../queue/image.queue.js";
 import {
   PAGINATION_DEFAULT_LIMIT,
   PAGINATION_DEFAULT_PAGE,
@@ -116,10 +115,6 @@ export async function generateThemes(
     `[themes.generate] completed inserted=${insertedThemes.length} durationMs=${Date.now() - startedAt}`
   );
 
-  for (const theme of insertedThemes) {
-    await enqueueThemeImageJob(theme.id);
-  }
-
   return insertedThemes;
 }
 /* =========================================================
@@ -146,8 +141,6 @@ export async function createCustomTheme(
       source: "custom",
     })
     .returning();
-
-  await enqueueThemeImageJob(theme.id);
 
   return theme;
 }

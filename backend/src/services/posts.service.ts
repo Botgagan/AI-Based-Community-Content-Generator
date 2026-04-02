@@ -267,17 +267,18 @@ export async function regeneratePost(id: string, userId: string) {
   });
 
   const newPost = parsed[0];
+  if (!newPost) {
+    throw new Error("Failed to regenerate post");
+  }
 
   const [updated] = await db
     .update(posts)
     .set({
+      title: newPost.title,
       content: newPost.content,
-      imageUrl: null,
     })
     .where(eq(posts.id, id))
     .returning();
-
-  await enqueuePostImageJob(updated.id);
 
   return updated;
 }

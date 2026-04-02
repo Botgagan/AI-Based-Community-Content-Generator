@@ -20,12 +20,21 @@ function getConfiguredImageModels() {
     .map((model) => model.trim())
     .filter(Boolean);
 
-  const preferred = configured || "openai/gpt-image-1";
-  return Array.from(new Set([preferred, ...fallback]));
+  const preferred = configured || "black-forest-labs/flux.2-klein-4b";
+  const all = Array.from(new Set([preferred, ...fallback]));
+  const maxModels = Number(process.env.IMAGE_MAX_MODELS || 2);
+  if (!Number.isFinite(maxModels) || maxModels <= 0) return all.slice(0, 2);
+  return all.slice(0, maxModels);
 }
 
 function getImageAspectRatio() {
   return process.env.IMAGE_ASPECT_RATIO?.trim() || "1:1";
+}
+
+function getImageRequestTimeoutMs() {
+  const value = Number(process.env.IMAGE_REQUEST_TIMEOUT_MS || 45000);
+  if (!Number.isFinite(value) || value <= 0) return 45000;
+  return value;
 }
 
 function extractBase64FromDataUrl(dataUrl: string) {
@@ -33,10 +42,6 @@ function extractBase64FromDataUrl(dataUrl: string) {
   const index = dataUrl.indexOf(marker);
   if (index === -1) return null;
   return dataUrl.slice(index + marker.length);
-}
-
-function hasNoEndpointError(responseText: string) {
-  return responseText.toLowerCase().includes("no endpoints found");
 }
 
 async function requestOpenRouterImage(params: {
@@ -76,6 +81,22 @@ async function requestOpenRouterImage(params: {
   }
 }
 
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string) {
+  let timeout: NodeJS.Timeout | null = null;
+
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timeout = setTimeout(() => {
+      reject(new Error(`Timed out after ${timeoutMs}ms (${label})`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
 function extractImageDataUrl(payload: OpenRouterResponse) {
   const firstImage = payload.choices?.[0]?.message?.images?.[0];
   return firstImage?.image_url?.url || firstImage?.imageUrl?.url || null;
@@ -87,6 +108,7 @@ export async function generateImageBase64(prompt: string) {
   }
 
   const models = getConfiguredImageModels();
+  const timeoutMs = getImageRequestTimeoutMs();
   const requestErrors: string[] = [];
 
   for (const model of models) {
@@ -98,34 +120,28 @@ export async function generateImageBase64(prompt: string) {
       {
         includeImageConfig: true,
         modalities: ["image", "text"],
-        label: "image+text with image_config",
-      },
-      {
-        includeImageConfig: false,
-        modalities: ["image", "text"],
-        label: "image+text",
+        label: "balanced-primary",
       },
       {
         includeImageConfig: false,
         modalities: ["image"],
-        label: "image-only",
+        label: "balanced-fallback-format",
       },
     ];
 
     for (const attempt of attempts) {
-      const result = await requestOpenRouterImage({
-        model,
-        prompt,
-        includeImageConfig: attempt.includeImageConfig,
-        modalities: attempt.modalities,
-      });
+      const result = await withTimeout(
+        requestOpenRouterImage({
+          model,
+          prompt,
+          includeImageConfig: attempt.includeImageConfig,
+          modalities: attempt.modalities,
+        }),
+        timeoutMs,
+        `${model} ${attempt.label}`
+      );
 
       if (!result.ok) {
-        if (hasNoEndpointError(result.text)) {
-          requestErrors.push(`[${model} ${attempt.label}] ${result.text}`);
-          break;
-        }
-
         requestErrors.push(`[${model} ${attempt.label}] ${result.text}`);
         continue;
       }

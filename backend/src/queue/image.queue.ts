@@ -54,22 +54,22 @@ async function enqueueImageJob(job: ImageGenerationJob) {
     return;
   }
 
+  const attempts = Number(process.env.IMAGE_JOB_ATTEMPTS || 2);
+  const backoffDelayMs = Number(process.env.IMAGE_JOB_BACKOFF_MS || 2000);
+
   await imageQueue.add("generate", job, {
-    jobId: `${job.entityType}:${job.entityId}`,
+    // BullMQ custom job IDs cannot contain ":".
+    jobId: `${job.entityType}-${job.entityId}`,
     removeOnComplete: 1000,
     removeOnFail: 5000,
-    attempts: 3,
+    attempts: Number.isFinite(attempts) && attempts > 0 ? attempts : 2,
     backoff: {
       type: "exponential",
-      delay: 3000,
+      delay:
+        Number.isFinite(backoffDelayMs) && backoffDelayMs > 0
+          ? backoffDelayMs
+          : 2000,
     },
-  });
-}
-
-export async function enqueueThemeImageJob(themeId: string) {
-  await enqueueImageJob({
-    entityType: "theme",
-    entityId: themeId,
   });
 }
 

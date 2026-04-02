@@ -29,7 +29,7 @@ export function startImageWorker() {
     },
     {
       connection: redis,
-      concurrency: Number(process.env.IMAGE_WORKER_CONCURRENCY || 2),
+      concurrency: Number(process.env.IMAGE_WORKER_CONCURRENCY || 3),
     }
   );
 

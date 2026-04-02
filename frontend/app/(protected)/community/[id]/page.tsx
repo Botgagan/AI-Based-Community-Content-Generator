@@ -143,12 +143,6 @@ export default function CommunityDetailPage() {
 
   useEffect(() => {
     const timer = setInterval(() => {
-      if (activeTab === "themes" && themes.some((theme) => !theme.imageUrl)) {
-        fetchThemes(themesPage).catch((error) => {
-          console.error("Failed to refresh themes", error);
-        });
-      }
-
       if (activeTab === "posts" && posts.some((post) => !post.imageUrl)) {
         fetchPosts(selectedThemeFilter === "all" ? undefined : selectedThemeFilter, postsPage).catch((error) => {
           console.error("Failed to refresh posts", error);
@@ -157,7 +151,7 @@ export default function CommunityDetailPage() {
     }, 8000);
 
     return () => clearInterval(timer);
-  }, [activeTab, posts, postsPage, selectedThemeFilter, themes, themesPage]);
+  }, [activeTab, posts, postsPage, selectedThemeFilter, themesPage]);
 
   const generateThemes = async () => {
     if (isGeneratingThemes) return;
@@ -552,17 +546,6 @@ export default function CommunityDetailPage() {
             {themes.map((theme) => (
               <div key={theme.id} className="panel flex flex-col gap-4 rounded-xl p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  {theme.imageUrl ? (
-                    <img
-                      src={theme.imageUrl}
-                      alt={theme.title}
-                      className="mb-3 h-36 w-full max-w-lg rounded-lg object-cover"
-                    />
-                  ) : (
-                    <div className="mb-3 rounded-lg border border-dashed border-[#d1d5db] bg-white/50 px-3 py-4 text-xs text-[#6b7280]">
-                      Theme image generating...
-                    </div>
-                  )}
                   <h3 className="text-lg font-semibold text-[#111827]">{theme.title}</h3>
                   <p className="text-sm text-[#6b7280]">{theme.description}</p>
                 </div>

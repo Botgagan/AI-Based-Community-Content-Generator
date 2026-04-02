@@ -32,6 +32,19 @@ Example:
 ]
 `;
 
+function compactContext(value?: string | null, maxChars = 500) {
+  return (value || "").replace(/\s+/g, " ").trim().slice(0, maxChars);
+}
+
+function compactPostContentForVisuals(value?: string | null, maxChars = 280) {
+  const normalized = compactContext(value, maxChars * 2)
+    .replace(/#[\w-]+/g, "")
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/["'`]/g, "");
+
+  return normalized.slice(0, maxChars);
+}
+
 export function generatePostsPrompt(input: {
   title: string;
   description: string;
@@ -64,9 +77,10 @@ Rules:
   - content (5-6 lines)
 - Add hashtags in LAST line
 - Professional + engaging tone
-- Keep posts aligned with the given community context
-- Do not invent facts, names, stats, claims, events, links, or offers not present in the context
-- If context is limited, write broadly useful but safe content grounded in the provided theme/community
+- Every post MUST be clearly about the theme "${input.title}" and the community "${communityName}"
+- Post title must reference the theme idea directly, not generic social copy and same goes for content
+- First 1-2 lines of content must connect theme + community context
+- Use scraped context as grounding where useful, but keep claims practical and non-fabricated
 - No explanations
 - Use escaped newlines in content (\\n), not raw line breaks inside JSON strings
 
@@ -80,29 +94,6 @@ Format:
 `;
 }
 
-export function generateThemeImagePrompt(input: {
-  communityName: string;
-  communityDescription: string;
-  themeTitle: string;
-  themeDescription: string;
-  scrapedContext?: string | null;
-}) {
-  return `
-Create a clean, high-quality social media banner image.
-Community: ${input.communityName}
-Community context: ${input.communityDescription}
-Theme title: ${input.themeTitle}
-Theme description: ${input.themeDescription}
-Scraped context: ${(input.scrapedContext || "").slice(0, 500)}
-
-Instructions:
-- Keep visuals relevant to the theme and community mission.
-- Avoid random unrelated objects or concepts.
-- No text overlays, no logos, no watermarks.
-- Professional, modern, and optimistic visual tone.
-`.trim();
-}
-
 export function generatePostImagePrompt(input: {
   communityName: string;
   communityDescription: string;
@@ -112,19 +103,34 @@ export function generatePostImagePrompt(input: {
   postContent: string;
   scrapedContext?: string | null;
 }) {
-  return `
-Create a high-quality social media post image.
-Community: ${input.communityName}
-Community context: ${input.communityDescription}
-Theme: ${input.themeTitle} - ${input.themeDescription}
-Post title: ${input.postTitle}
-Post content: ${input.postContent}
-Scraped context: ${(input.scrapedContext || "").slice(0, 500)}
+  const scrapedContext = compactContext(input.scrapedContext, 350);
+  const postVisualBrief = compactPostContentForVisuals(input.postContent, 260);
 
-Instructions:
-- The scene must logically match the post message.
-- Keep composition clear and focused for feed use.
-- No text overlays, no logos, no watermarks.
-- Professional and engaging visual style.
+  return `
+Create one high-quality image for a social post.
+
+OBJECTIVE
+- The scene must logically match the theme and post message.
+- The visual should communicate the idea through imagery only.
+
+INPUTS
+- Community: ${input.communityName}
+- Community context: ${input.communityDescription}
+- Theme: ${input.themeTitle}
+- Theme description: ${input.themeDescription}
+- Post title: ${input.postTitle}
+- Post visual brief: ${postVisualBrief || "Not provided"}
+- Source context: ${scrapedContext || "Not provided"}
+
+VISUAL DIRECTION
+- Use one focused scene with meaningful subject, setting, and action.
+- Prefer realistic, believable details over abstract generic art.
+- Strong composition for feed use, subject clearly visible.
+
+HARD CONSTRAINTS
+- NO text anywhere in image.
+- NO letters, words, numbers, slogans, hashtags, captions, logos, UI, watermarks.
+- Do not render signs, screens, documents, or products with readable writing.
+- Keep objects and background directly relevant to the post meaning.
 `.trim();
 }
