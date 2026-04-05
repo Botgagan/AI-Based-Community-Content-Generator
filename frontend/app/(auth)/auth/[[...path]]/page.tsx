@@ -16,11 +16,18 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+    let redirected = false;
+
     const checkSession = async () => {
+      if (cancelled || redirected) return;
+
       try {
         const exists = await Session.doesSessionExist();
+        if (cancelled || redirected) return;
 
         if (exists) {
+          redirected = true;
           const redirectTo = searchParams.get("redirectTo");
 
           if (redirectTo) {
@@ -34,11 +41,19 @@ export default function AuthPage() {
 
         setLoading(false);
       } catch {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     checkSession();
+
+    // Keep checking while auth UI is open; this catches post-login session creation.
+    const intervalId = window.setInterval(checkSession, 1000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, [router, searchParams]);
 
   if (loading) {

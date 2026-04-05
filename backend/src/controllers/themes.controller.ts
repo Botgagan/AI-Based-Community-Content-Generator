@@ -6,6 +6,9 @@ import {
   createCustomTheme,
   getThemesByCommunity,
   deleteTheme,
+  updateThemeStatus,
+  updateTheme,
+  getThemeDetail,
 } from "../services/themes.service.js";
 
 import { getPrimaryUserId } from "../utils/getPrimaryUserId.js";
@@ -87,7 +90,7 @@ export async function getThemesController(
 
     const userId = await getPrimaryUserId(req);
 
-    const { communityId } = req.query;
+    const { communityId, status } = req.query;
 
     const page = resolvePage(req.query.page, PAGINATION_DEFAULT_PAGE);
     const limit = resolveLimit(req.query.limit, {
@@ -98,11 +101,20 @@ export async function getThemesController(
       return res.status(400).json({ message: "communityId required" });
     }
 
+    const statuses =
+      typeof status === "string"
+        ? status
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean) as ("pending" | "active" | "inactive" | "deleted")[]
+        : undefined;
+
     const themes = await getThemesByCommunity({
       communityId: communityId as string,
       userId,
       page,
       limit,
+      statuses,
     });
 
     res.json({
@@ -137,6 +149,68 @@ export async function deleteThemeController(
     res.json({ success: true });
   } catch (err: any) {
     console.error("delete theme error:", err);
+    res.status(403).json({ message: err.message });
+  }
+}
+
+export async function updateThemeStatusController(
+  req: Request & SessionRequest,
+  res: Response
+) {
+  try {
+    const userId = await getPrimaryUserId(req);
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!id || !status) {
+      return res.status(400).json({ message: "Theme id and status are required" });
+    }
+
+    const theme = await updateThemeStatus(id, status, userId);
+    res.json({ success: true, theme });
+  } catch (err: any) {
+    console.error("update theme status error:", err);
+    res.status(403).json({ message: err.message });
+  }
+}
+
+export async function updateThemeController(
+  req: Request & SessionRequest,
+  res: Response
+) {
+  try {
+    const userId = await getPrimaryUserId(req);
+    const { id } = req.params;
+    const { title, description } = req.body;
+
+    if (!id) {
+      return res.status(400).json({ message: "Theme id required" });
+    }
+
+    const theme = await updateTheme(id, { title, description }, userId);
+    res.json({ success: true, theme });
+  } catch (err: any) {
+    console.error("update theme error:", err);
+    res.status(403).json({ message: err.message });
+  }
+}
+
+export async function getThemeDetailController(
+  req: Request & SessionRequest,
+  res: Response
+) {
+  try {
+    const userId = await getPrimaryUserId(req);
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({ message: "Theme id required" });
+    }
+
+    const detail = await getThemeDetail(id, userId);
+    res.json({ success: true, ...detail });
+  } catch (err: any) {
+    console.error("get theme detail error:", err);
     res.status(403).json({ message: err.message });
   }
 }

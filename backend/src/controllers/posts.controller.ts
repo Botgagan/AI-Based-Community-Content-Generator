@@ -7,6 +7,7 @@ import {
   deletePost,
   generatePostsFromTheme,
   regeneratePost,
+  reviewPost,
 } from "../services/posts.service.js";
 
 import { getPrimaryUserId } from "../utils/getPrimaryUserId.js";
@@ -28,12 +29,21 @@ export async function getPostsController(
   try {
     const userId = await getPrimaryUserId(req);
 
-    const { themeId, communityId, page, limit } = req.query;// Optional filters
+    const { themeId, communityId, status, page, limit } = req.query;// Optional filters
+
+    const statuses =
+      typeof status === "string"
+        ? status
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean)
+        : undefined;
 
     const posts = await getPosts({
       userId,
       themeId: themeId as string | undefined,
       communityId: communityId as string | undefined,
+      statuses,
       page: resolvePage(page, PAGINATION_DEFAULT_PAGE),
       limit: resolveLimit(limit, { fallback: PAGINATION_DEFAULT_LIMIT }),
     });
@@ -137,6 +147,38 @@ export async function regeneratePostController(
     const { id } = req.params;
 
     const post = await regeneratePost(id, userId);
+
+    res.json({
+      success: true,
+      post,
+    });
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
+}
+
+/* =============================
+   REVIEW POST (OWNER)
+============================= */
+
+export async function reviewPostController(
+  req: Request & SessionRequest,
+  res: Response
+) {
+  try {
+    const userId = await getPrimaryUserId(req);
+    const { id } = req.params;
+    const { status, rejectionReason } = req.body;
+
+    if (!id || !status) {
+      return res.status(400).json({ message: "post id and status are required" });
+    }
+
+    if (status !== "approved" && status !== "rejected") {
+      return res.status(400).json({ message: "status must be approved or rejected" });
+    }
+
+    const post = await reviewPost(id, status, rejectionReason, userId);
 
     res.json({
       success: true,

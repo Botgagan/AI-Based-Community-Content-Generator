@@ -7,6 +7,7 @@ import {
   deletePostController,
   generatePostsController,
   regeneratePostController,
+  reviewPostController,
 } from "../controllers/posts.controller.js";
 
 const router = Router();
@@ -20,5 +21,6 @@ router.put("/:id", verifySession(), updatePostController);
 router.delete("/:id", verifySession(), deletePostController);
 
 router.patch("/:id/regenerate", verifySession(), regeneratePostController);
+router.patch("/:id/review", verifySession(), reviewPostController);
 
 export default router;

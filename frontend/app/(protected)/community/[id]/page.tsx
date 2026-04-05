@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { url } from "@/lib/axiosInstance";
 import InviteModal from "@/components/InviteModal";
@@ -17,6 +17,7 @@ type Community = {
   name: string;
   description: string;
   imageUrl?: string | null;
+  role?: "owner" | "member";
 };
 
 type Theme = {
@@ -25,6 +26,8 @@ type Theme = {
   description: string;
   imageUrl?: string | null;
   source?: "ai" | "custom";
+  status?: "pending" | "active" | "inactive" | "deleted";
+  postCount?: number;
 };
 
 type Post = {
@@ -32,12 +35,15 @@ type Post = {
   title: string;
   content: string;
   imageUrl?: string | null;
+  status?: "pending" | "approved" | "rejected";
+  rejectionReason?: string | null;
   themeId: string;
   themeTitle: string;
 };
 
 export default function CommunityDetailPage() {
   const { id } = useParams() as { id: string };
+  const router = useRouter();
 
   const [community, setCommunity] = useState<Community | null>(null);
   const [themes, setThemes] = useState<Theme[]>([]);
@@ -70,6 +76,7 @@ export default function CommunityDetailPage() {
   const [postsPage, setPostsPage] = useState(PAGINATION_DEFAULT_PAGE);
   const [postsHasMore, setPostsHasMore] = useState(true);
   const hasAIThemes = allThemes.some((theme) => theme.source === "ai");
+  const isOwner = community?.role === "owner";
 
   const fetchThemes = async (page = PAGINATION_DEFAULT_PAGE) => {
     const [res, nextPageRes] = await Promise.all([
@@ -153,6 +160,34 @@ export default function CommunityDetailPage() {
     return () => clearInterval(timer);
   }, [activeTab, posts, postsPage, selectedThemeFilter, themesPage]);
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      Promise.all([
+        url.get(`/api/community/${id}`),
+        url.get(
+          `/api/themes?communityId=${id}&page=${themesPage}&limit=${PAGINATION_DEFAULT_LIMIT}`
+        ),
+        url.get(
+          `/api/themes?communityId=${id}&page=${themesPage + 1}&limit=${PAGINATION_DEFAULT_LIMIT}`
+        ),
+        url.get(`/api/themes?communityId=${id}&limit=${THEMES_ALL_FETCH_LIMIT}`),
+      ])
+        .then(([communityRes, themesRes, nextThemesRes, allThemesRes]) => {
+          const refreshedThemes = themesRes.data.themes || [];
+          const refreshedNextThemes = nextThemesRes.data.themes || [];
+          setCommunity(communityRes.data.community);
+          setThemes(refreshedThemes);
+          setThemesHasMore(refreshedNextThemes.length > 0);
+          setAllThemes(allThemesRes.data.themes || []);
+        })
+        .catch(() => {
+          // Silent background refresh failure; user actions still show explicit errors.
+        });
+    }, 8000);
+
+    return () => clearInterval(timer);
+  }, [id, themesPage]);
+
   const generateThemes = async () => {
     if (isGeneratingThemes) return;
 
@@ -183,6 +218,12 @@ export default function CommunityDetailPage() {
   };
 
   const addCustomTheme = async () => {
+    if (!isOwner) {
+      setBannerType("error");
+      setBanner("Only community owner can add custom themes.");
+      return;
+    }
+
     if (!customTheme.title.trim()) return;
 
     await url.post("/api/themes/custom", {
@@ -304,9 +345,19 @@ export default function CommunityDetailPage() {
             <p className="mt-1 text-sm text-[#6b7280]">{community.description}</p>
           </div>
 
-          <button onClick={() => setShowInvite(true)} className="btn-primary px-5 py-2.5 text-sm">
-            Invite Members
-          </button>
+          <div className="flex gap-2">
+            {community.role === "owner" && (
+              <button
+                onClick={() => router.push(`/community/${id}/admin`)}
+                className="btn-secondary px-5 py-2.5 text-sm"
+              >
+                Admin Panel
+              </button>
+            )}
+            <button onClick={() => setShowInvite(true)} className="btn-primary px-5 py-2.5 text-sm">
+              Invite Members
+            </button>
+          </div>
         </div>
 
         {banner && (
@@ -385,9 +436,22 @@ export default function CommunityDetailPage() {
               <div className="grid gap-5 md:grid-cols-2">
                 {posts.map((post) => (
                   <div key={post.id} className="panel space-y-3 rounded-xl p-5">
-                    <span className="inline-block rounded-full bg-[#eef2ff] px-3 py-1 text-xs text-[#4f5fcf]">
-                      {post.themeTitle}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-block rounded-full bg-[#eef2ff] px-3 py-1 text-xs text-[#4f5fcf]">
+                        {post.themeTitle}
+                      </span>
+                      <span
+                        className={`inline-block rounded-full px-3 py-1 text-xs ${
+                          post.status === "approved"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : post.status === "rejected"
+                              ? "bg-rose-50 text-rose-700"
+                              : "bg-amber-50 text-amber-700"
+                        }`}
+                      >
+                        {post.status || "pending"}
+                      </span>
+                    </div>
 
                     <h3 className="text-lg font-semibold text-[#111827]">{post.title}</h3>
 
@@ -423,31 +487,46 @@ export default function CommunityDetailPage() {
                         </div>
                       </div>
                     ) : (
-                      <p className="text-sm text-[#4b5563]">{post.content}</p>
+                      <div className="space-y-2">
+                        <p className="text-sm text-[#4b5563]">{post.content}</p>
+                        {post.status === "rejected" && post.rejectionReason ? (
+                          <p className="text-xs text-rose-700">
+                            Rejection reason: {post.rejectionReason}
+                          </p>
+                        ) : null}
+                      </div>
                     )}
 
                     {editingPostId !== post.id && (
-                      <div className="flex gap-5 text-sm">
-                        <button
-                          onClick={() => {
-                            setEditingPostId(post.id);
-                            setEditPrompt(post.content);
-                          }}
-                          className="text-[#1b75d0]"
-                        >
-                          Edit
-                        </button>
-                        <button onClick={() => deletePost(post.id)} className="text-rose-600">
-                          Delete
-                        </button>
-                        <button
-                          onClick={() => regeneratePost(post.id)}
-                          disabled={regeneratingPostId === post.id}
-                          className="text-[#4f5fcf] disabled:opacity-60"
-                        >
-                          {regeneratingPostId === post.id ? "Regenerating..." : "Regenerate"}
-                        </button>
-                      </div>
+                      <>
+                        {post.status === "approved" ? (
+                          <div className="flex justify-end">
+                            <button className="btn-primary px-4 py-2 text-sm">Schedule</button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-5 text-sm">
+                            <button
+                              onClick={() => {
+                                setEditingPostId(post.id);
+                                setEditPrompt(post.content);
+                              }}
+                              className="text-[#1b75d0]"
+                            >
+                              Edit
+                            </button>
+                            <button onClick={() => deletePost(post.id)} className="text-rose-600">
+                              Delete
+                            </button>
+                            <button
+                              onClick={() => regeneratePost(post.id)}
+                              disabled={regeneratingPostId === post.id}
+                              className="text-[#4f5fcf] disabled:opacity-60"
+                            >
+                              {regeneratingPostId === post.id ? "Regenerating..." : "Regenerate"}
+                            </button>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 ))}
@@ -491,15 +570,17 @@ export default function CommunityDetailPage() {
                 </button>
               )}
 
-              <button
-                onClick={() => setShowCustomForm((prev) => !prev)}
-                className="btn-secondary px-5 py-2 text-sm"
-              >
-                + Add Custom Theme
-              </button>
+              {isOwner && (
+                <button
+                  onClick={() => setShowCustomForm((prev) => !prev)}
+                  className="btn-secondary px-5 py-2 text-sm"
+                >
+                  + Add Custom Theme
+                </button>
+              )}
             </div>
 
-            {showCustomForm && (
+            {isOwner && showCustomForm && (
               <div className="panel space-y-3 rounded-xl p-5">
                 <input
                   placeholder="Theme Title"
@@ -546,16 +627,36 @@ export default function CommunityDetailPage() {
             {themes.map((theme) => (
               <div key={theme.id} className="panel flex flex-col gap-4 rounded-xl p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
+                  <div className="mb-2 flex items-center gap-2 text-xs">
+                    <span className="rounded-full bg-[#eef2ff] px-2 py-1 text-[#4f5fcf]">
+                      {theme.source === "ai" ? "AI" : "Custom"}
+                    </span>
+                    <span
+                      className={`rounded-full px-2 py-1 ${
+                        theme.status === "active"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : theme.status === "inactive"
+                            ? "bg-gray-100 text-gray-700"
+                            : "bg-amber-50 text-amber-700"
+                      }`}
+                    >
+                      {theme.status === "active" ? "approved" : theme.status || "pending"}
+                    </span>
+                  </div>
                   <h3 className="text-lg font-semibold text-[#111827]">{theme.title}</h3>
                   <p className="text-sm text-[#6b7280]">{theme.description}</p>
                 </div>
 
                 <button
                   onClick={() => generatePosts(theme)}
-                  disabled={generatingPostsThemeId === theme.id}
+                  disabled={generatingPostsThemeId === theme.id || theme.status !== "active"}
                   className="btn-secondary px-4 py-2 text-sm font-medium text-[#4f5fcf] disabled:opacity-60"
                 >
-                  {generatingPostsThemeId === theme.id ? "Generating..." : "Generate Posts"}
+                  {theme.status !== "active"
+                    ? "Waiting Admin Approval"
+                    : generatingPostsThemeId === theme.id
+                      ? "Generating..."
+                      : "Generate Posts"}
                 </button>
               </div>
             ))}

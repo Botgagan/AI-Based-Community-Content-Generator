@@ -13,6 +13,11 @@ export const posts = pgTable("posts", {
 
   imageUrl: text("image_url"),
 
+  status: text("status").notNull().default("pending"),
+  // "pending" | "approved" | "rejected"
+
+  rejectionReason: text("rejection_reason"),
+
   isPolished: boolean("is_polished").default(false),
 
   createdAt: timestamp("created_at").defaultNow(),

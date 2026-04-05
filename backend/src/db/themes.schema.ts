@@ -21,5 +21,8 @@ export const themes = pgTable(
     source: text("source").notNull().default("ai"),
     // "ai" or "custom"
 
+    status: text("status").notNull().default("pending"),
+    // "pending" | "active" | "inactive" | "deleted"
+
     createdAt: timestamp("created_at").defaultNow(),
   });

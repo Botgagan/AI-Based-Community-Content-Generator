@@ -88,6 +88,7 @@ export async function getCommunityById(id: string, userId: string) {
       twitterUrl: communities.twitterUrl,
       imageUrl: communities.imageUrl,
       createdAt: communities.createdAt,
+      role: communityMembers.role,
     })
     .from(communityMembers)
     .innerJoin(

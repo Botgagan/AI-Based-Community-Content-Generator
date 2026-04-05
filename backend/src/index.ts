@@ -10,6 +10,7 @@ import communityRoutes from "./routes/community.route.js";
 import themesRoutes from "./routes/themes.route.js";
 import inviteRoutes from "./routes/invite.route.js";
 import postsRoutes from "./routes/posts.routes.js";
+import userRoutes from "./routes/user.route.js";
 import { startImageWorker } from "./workers/image.worker.js";
 
 dotenv.config();
@@ -39,6 +40,7 @@ app.use("/api/community", communityRoutes);
 app.use("/api/themes", themesRoutes);
 app.use("/api/invite", inviteRoutes);
 app.use("/api/posts", postsRoutes);
+app.use("/api/user", userRoutes);
 
 /* ---------------- SUPERTOKENS ---------------- */
 

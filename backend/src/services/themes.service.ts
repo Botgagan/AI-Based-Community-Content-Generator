@@ -1,8 +1,9 @@
 import { db } from "../index.js";
 import { themes } from "../db/themes.schema";
+import { posts } from "../db/posts.schema";
 import { communityMembers } from "../db/communityMembers.schema";
 import { communities } from "../db/community.schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { getAggregatedContent } from "../apify/aggregator.js";
 import { generateAIThemes } from "../ai/theme.generator.js";
 import {
@@ -11,14 +12,9 @@ import {
   resolveOffset,
 } from "../config/pagination.js";
 
-/* =========================================================
-   VERIFY COMMUNITY MEMBERSHIP
-========================================================= */
+type ThemeStatus = "pending" | "active" | "inactive" | "deleted";
 
-async function verifyCommunityMembership(
-  communityId: string,
-  userId: string
-) {
+async function verifyCommunityMembership(communityId: string, userId: string) {
   const [membership] = await db
     .select()
     .from(communityMembers)
@@ -36,34 +32,23 @@ async function verifyCommunityMembership(
   return membership;
 }
 
-/* =========================================================
-   GENERATE AI THEMES
-========================================================= */
-
-export async function generateThemes(
-  communityId: string,
-  userId: string
-) {
-  const startedAt = Date.now();
-  console.info(`[themes.generate] started communityId=${communityId}`);
-
-  await verifyCommunityMembership(communityId, userId);
-  console.info("[themes.generate] membership verified");
-
-  const existingThemes = await db
-    .select()
-    .from(themes)
-    .where(
-      and(
-        eq(themes.communityId, communityId),
-        eq(themes.source, "ai")
-      )
-    );
-
-  if (existingThemes.length > 0) {
-    throw new Error("Themes already generated for this community");
+async function verifyCommunityOwner(communityId: string, userId: string) {
+  const membership = await verifyCommunityMembership(communityId, userId);
+  if (membership.role !== "owner") {
+    throw new Error("Only owner can perform this action");
   }
-  console.info("[themes.generate] existing AI themes check passed");
+}
+
+async function getThemeById(themeId: string) {
+  const [theme] = await db.select().from(themes).where(eq(themes.id, themeId));
+  if (!theme) {
+    throw new Error("Theme not found");
+  }
+  return theme;
+}
+
+export async function generateThemes(communityId: string, userId: string) {
+  await verifyCommunityMembership(communityId, userId);
 
   const [community] = await db
     .select()
@@ -73,14 +58,12 @@ export async function generateThemes(
   if (!community) {
     throw new Error("Community not found");
   }
-  console.info("[themes.generate] community loaded");
 
   const content = await getAggregatedContent({
     websiteUrl: community.websiteUrl,
     youtubeUrl: community.youtubeUrl,
     twitterUrl: community.twitterUrl,
   });
-  console.info("[themes.generate] content aggregation finished");
 
   let aiThemes: { title: string; description: string }[] = [];
 
@@ -90,7 +73,6 @@ export async function generateThemes(
     console.error("AI parsing error:", err);
     throw new Error("Failed to generate themes");
   }
-  console.info(`[themes.generate] ai returned ${aiThemes.length} themes`);
 
   if (!aiThemes || aiThemes.length === 0) {
     throw new Error("No themes generated");
@@ -107,19 +89,13 @@ export async function generateThemes(
         description: t.description,
         scrapedContext: content,
         source: "ai",
+        status: "pending",
       }))
     )
     .returning();
 
-  console.info(
-    `[themes.generate] completed inserted=${insertedThemes.length} durationMs=${Date.now() - startedAt}`
-  );
-
   return insertedThemes;
 }
-/* =========================================================
-   CREATE CUSTOM THEME
-========================================================= */
 
 export async function createCustomTheme(
   data: {
@@ -129,7 +105,7 @@ export async function createCustomTheme(
   },
   userId: string
 ) {
-  await verifyCommunityMembership(data.communityId, userId);
+  await verifyCommunityOwner(data.communityId, userId);
 
   const [theme] = await db
     .insert(themes)
@@ -139,69 +115,140 @@ export async function createCustomTheme(
       description: data.description,
       scrapedContext: "",
       source: "custom",
+      status: "pending",
     })
     .returning();
 
   return theme;
 }
 
-/* =========================================================
-   GET THEMES
-========================================================= */
-
 export async function getThemesByCommunity({
   communityId,
   userId,
   page = PAGINATION_DEFAULT_PAGE,
   limit = PAGINATION_DEFAULT_LIMIT,
+  statuses,
 }: {
   communityId: string;
   userId: string;
   page?: number;
   limit?: number;
+  statuses?: ThemeStatus[];
 }) {
-
   await verifyCommunityMembership(communityId, userId);
-
   const offset = resolveOffset(page, limit);
 
+  const filters = [eq(themes.communityId, communityId)];
+
+  if (statuses && statuses.length > 0) {
+    filters.push(inArray(themes.status, statuses));
+  } else {
+    filters.push(sql`${themes.status} <> 'deleted'`);
+  }
+
   return db
-    .select()
+    .select({
+      id: themes.id,
+      communityId: themes.communityId,
+      title: themes.title,
+      description: themes.description,
+      scrapedContext: themes.scrapedContext,
+      imageUrl: themes.imageUrl,
+      source: themes.source,
+      status: themes.status,
+      createdAt: themes.createdAt,
+      postCount: sql<number>`count(${posts.id})`.as("postCount"),
+    })
     .from(themes)
-    .where(eq(themes.communityId, communityId))
+    .leftJoin(posts, eq(posts.themeId, themes.id))
+    .where(and(...filters))
+    .groupBy(
+      themes.id,
+      themes.communityId,
+      themes.title,
+      themes.description,
+      themes.scrapedContext,
+      themes.imageUrl,
+      themes.source,
+      themes.status,
+      themes.createdAt
+    )
     .orderBy(desc(themes.createdAt))
     .limit(limit)
     .offset(offset);
 }
 
-/* =========================================================
-   DELETE THEME
-========================================================= */
-
-export async function deleteTheme(
+export async function updateThemeStatus(
   themeId: string,
+  status: ThemeStatus,
   userId: string
 ) {
-  const [theme] = await db
+  const theme = await getThemeById(themeId);
+  await verifyCommunityOwner(theme.communityId, userId);
+
+  const allowed: ThemeStatus[] = ["pending", "active", "inactive", "deleted"];
+  if (!allowed.includes(status)) {
+    throw new Error("Invalid theme status");
+  }
+
+  const [updatedTheme] = await db
+    .update(themes)
+    .set({ status })
+    .where(eq(themes.id, themeId))
+    .returning();
+
+  return updatedTheme;
+}
+
+export async function updateTheme(
+  themeId: string,
+  data: { title?: string; description?: string },
+  userId: string
+) {
+  const theme = await getThemeById(themeId);
+  await verifyCommunityOwner(theme.communityId, userId);
+
+  const [updatedTheme] = await db
+    .update(themes)
+    .set({
+      title: data.title ?? theme.title,
+      description: data.description ?? theme.description,
+    })
+    .where(eq(themes.id, themeId))
+    .returning();
+
+  return updatedTheme;
+}
+
+export async function getThemeDetail(themeId: string, userId: string) {
+  const theme = await getThemeById(themeId);
+  await verifyCommunityOwner(theme.communityId, userId);
+
+  const themePosts = await db
     .select()
-    .from(themes)
-    .where(eq(themes.id, themeId));
+    .from(posts)
+    .where(eq(posts.themeId, themeId))
+    .orderBy(desc(posts.createdAt));
 
-  if (!theme) {
-    throw new Error("Theme not found");
-  }
+  const stats = {
+    total: themePosts.length,
+    pending: themePosts.filter((post) => post.status === "pending").length,
+    approved: themePosts.filter((post) => post.status === "approved").length,
+    rejected: themePosts.filter((post) => post.status === "rejected").length,
+  };
 
-  const membership = await verifyCommunityMembership(
-    theme.communityId,
-    userId
-  );
+  return {
+    theme,
+    posts: themePosts,
+    stats,
+  };
+}
 
-  // owner-only delete rule
-  if (membership.role !== "owner") {
-    throw new Error("Only owner can delete themes");
-  }
+export async function deleteTheme(themeId: string, userId: string) {
+  const theme = await getThemeById(themeId);
+  await verifyCommunityOwner(theme.communityId, userId);
 
-  await db.delete(themes).where(eq(themes.id, themeId));
+  await db.update(themes).set({ status: "deleted" }).where(eq(themes.id, themeId));
 
   return { success: true };
 }
