@@ -12,6 +12,7 @@ import inviteRoutes from "./routes/invite.route.js";
 import postsRoutes from "./routes/posts.routes.js";
 import userRoutes from "./routes/user.route.js";
 import { startImageWorker } from "./workers/image.worker.js";
+import { startFacebookScheduleWorker } from "./workers/facebook.schedule.worker.js";
 
 dotenv.config();
 
@@ -63,4 +64,5 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   startImageWorker();
+  startFacebookScheduleWorker();
 });

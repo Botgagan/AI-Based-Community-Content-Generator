@@ -34,8 +34,8 @@ async function verifyCommunityMembership(communityId: string, userId: string) {
 
 async function verifyCommunityOwner(communityId: string, userId: string) {
   const membership = await verifyCommunityMembership(communityId, userId);
-  if (membership.role !== "owner") {
-    throw new Error("Only owner can perform this action");
+  if (membership.role !== "owner" && membership.role !== "admin") {
+    throw new Error("Only owner or admin can perform this action");
   }
 }
 

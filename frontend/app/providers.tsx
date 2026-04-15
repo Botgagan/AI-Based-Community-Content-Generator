@@ -2,6 +2,7 @@
 
 import { SuperTokensWrapper } from "supertokens-auth-react";
 import { initSuperTokens } from "@/lib/supertokens";
+import { UIProvider } from "@/components/UIProvider";
 
 /* initialize immediately */
 initSuperTokens();
@@ -11,6 +12,10 @@ export default function Providers({
 }: {
   children: React.ReactNode;
 }) {
-  return <SuperTokensWrapper>{children}</SuperTokensWrapper>;
+  return (
+    <SuperTokensWrapper>
+      <UIProvider>{children}</UIProvider>
+    </SuperTokensWrapper>
+  );
 }
 

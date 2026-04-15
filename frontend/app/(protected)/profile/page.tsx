@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { url } from "@/lib/axiosInstance";
+import PageLoader from "@/components/PageLoader";
 
 type UserProfile = {
   id: string;
@@ -72,54 +73,56 @@ export default function ProfilePage() {
   }, [profile?.name]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-[#6b7280]">
-        Loading profile...
-      </div>
-    );
+    return <PageLoader label="Loading profile..." />;
   }
 
   return (
-    <div className="min-h-screen bg-app-gradient px-4 py-10 sm:px-6 md:py-12">
-      <div className="mx-auto max-w-4xl">
-        <div className="panel overflow-hidden rounded-3xl p-0">
-          <div className="bg-gradient-to-r from-[#e0e7ff] via-[#dbeafe] to-[#ecfeff] px-6 py-8 sm:px-10">
-            <h1 className="text-xl font-semibold text-[#1f2937] sm:text-2xl">Your Profile</h1>
-            <p className="mt-1 text-sm text-[#4b5563]">Account details linked to your login.</p>
+    <div className="px-1 py-2">
+      <div className="mx-auto max-w-5xl">
+        <div className="panel overflow-hidden">
+          <div className="bg-[linear-gradient(120deg,#f2f6ff,#eef2ff)] px-6 py-8 sm:px-10">
+            <p className="text-xs uppercase tracking-[0.14em] text-[rgba(0,0,0,0.8)]">Account</p>
+            <h1 className="mt-2 text-3xl font-extrabold tracking-[-0.02em] text-[#1d1d1f]">Your Profile</h1>
+            <p className="mt-1 text-sm text-[rgba(0,0,0,0.8)]">Account details linked to your sign-in method.</p>
           </div>
 
-          <div className="space-y-8 p-6 sm:p-10">
-            <div className="flex flex-col items-center text-center">
-              <div className="mb-4 flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-white text-3xl font-semibold text-[#4b5563] shadow">
-                {profile?.avatarUrl && !avatarBroken ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={profile.avatarUrl}
-                    alt="Profile"
-                    className="h-full w-full object-cover"
-                    onError={() => setAvatarBroken(true)}
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <span>{initials}</span>
-                )}
+          <div className="grid gap-6 p-6 sm:grid-cols-[280px_1fr] sm:p-10">
+            <div className="panel flex h-fit flex-col items-center rounded-2xl p-5 text-center">
+              <div className="mb-4 flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-white text-3xl font-bold text-[#4b5563] shadow">
+                  {profile?.avatarUrl && !avatarBroken ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={profile.avatarUrl}
+                      alt="Profile"
+                      className="h-full w-full object-cover"
+                      onError={() => setAvatarBroken(true)}
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <span>{initials}</span>
+                  )}
               </div>
-              <p className="text-2xl font-semibold text-[#111827]">Hi, {firstName}</p>
-              <p className="mt-1 text-sm text-[#6b7280]">{profile?.email || "No email available"}</p>
+              <p className="text-2xl font-bold tracking-[-0.02em] text-[#1d1d1f]">Hi, {firstName}</p>
+              <p className="mt-1 text-sm text-[rgba(0,0,0,0.8)]">{profile?.email || "No email available"}</p>
+              <div className="mt-4 w-full rounded-xl bg-[#eef3ff] p-3 text-left text-xs text-[#344054]">
+                <p className="font-semibold">Workspace Access</p>
+                <p className="mt-1">Member account active</p>
+                <p className="mt-1">Community creation enabled</p>
+              </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-xl border border-[#e5e7eb] bg-white/70 p-4">
-                <p className="text-xs uppercase tracking-wide text-[#6b7280]">Full Name</p>
-                <p className="mt-1 text-sm font-medium text-[#111827]">{displayFullName}</p>
+              <div className="rounded-[8px] border border-white/60 bg-[#f5f5f7] p-4">
+                <p className="text-xs uppercase tracking-wide text-[rgba(0,0,0,0.8)]">Full Name</p>
+                <p className="mt-1 text-sm font-semibold text-[#1d1d1f]">{displayFullName}</p>
               </div>
-              <div className="rounded-xl border border-[#e5e7eb] bg-white/70 p-4">
-                <p className="text-xs uppercase tracking-wide text-[#6b7280]">Phone</p>
-                <p className="mt-1 text-sm font-medium text-[#111827]">{profile?.phone || "-"}</p>
+              <div className="rounded-[8px] border border-white/60 bg-[#f5f5f7] p-4">
+                <p className="text-xs uppercase tracking-wide text-[rgba(0,0,0,0.8)]">Phone</p>
+                <p className="mt-1 text-sm font-semibold text-[#1d1d1f]">{profile?.phone || "-"}</p>
               </div>
-              <div className="rounded-xl border border-[#e5e7eb] bg-white/70 p-4 sm:col-span-2">
-                <p className="text-xs uppercase tracking-wide text-[#6b7280]">Email</p>
-                <p className="mt-1 break-all text-sm font-medium text-[#111827]">{profile?.email || "-"}</p>
+              <div className="rounded-[8px] border border-white/60 bg-[#f5f5f7] p-4 sm:col-span-2">
+                <p className="text-xs uppercase tracking-wide text-[rgba(0,0,0,0.8)]">Email</p>
+                <p className="mt-1 break-all text-sm font-semibold text-[#1d1d1f]">{profile?.email || "-"}</p>
               </div>
             </div>
           </div>
@@ -128,3 +131,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+

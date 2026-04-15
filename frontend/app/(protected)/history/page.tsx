@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { url } from "@/lib/axiosInstance";
+import FilterSelect from "@/components/FilterSelect";
 import {
   hasNextPageByLength,
   PAGINATION_DEFAULT_LIMIT,
@@ -80,67 +81,74 @@ export default function HistoryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-app-gradient px-4 py-10 sm:px-6">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-10 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-[#111827] md:text-3xl">Content History</h1>
-            <p className="mt-1 text-sm text-[#6b7280]">All posts generated across communities</p>
-          </div>
+    <div className="px-1 py-2">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <div className="panel overflow-hidden p-6 sm:p-7">
+          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-2xl font-extrabold tracking-[-0.02em] text-[#1d1d1f]">Post Timeline</h1>
+              <p className="mt-1 text-sm text-[rgba(0,0,0,0.8)]">Focus on one community or browse all generated content.</p>
+            </div>
 
-          <select
-            value={selectedCommunity}
-            onChange={(e) => handleFilterChange(e.target.value)}
-            className="input-field w-full md:w-64"
-          >
-            <option value="all">All Communities</option>
-            {communities.map((community) => (
-              <option key={community.id} value={community.id}>
-                {community.name}
-              </option>
-            ))}
-          </select>
+            <FilterSelect
+              value={selectedCommunity}
+              onChange={handleFilterChange}
+              options={[
+                { value: "all", label: "All Communities" },
+                ...communities.map((community) => ({
+                  value: community.id,
+                  label: community.name,
+                })),
+              ]}
+              className="w-full md:w-72"
+            />
+          </div>
         </div>
 
         {posts.length === 0 ? (
-          <div className="panel rounded-xl p-16 text-center text-[#6b7280]">No posts found</div>
+          <div className="panel rounded-[8px] p-16 text-center text-[rgba(0,0,0,0.8)]">No posts found</div>
         ) : (
           <>
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
               {posts.map((post) => (
-                <div key={post.id} className="panel space-y-3 rounded-xl p-6">
-                  <span className="inline-block rounded-full bg-[#eef2ff] px-3 py-1 text-xs text-[#4f5fcf]">
-                    {post.communityName}
-                  </span>
-                  <h3 className="text-base font-semibold text-[#111827]">{post.title}</h3>
+                <div key={post.id} className="panel relative space-y-3 rounded-[8px] p-5">
+                  <div className="absolute left-0 top-0 h-full w-1 rounded-l-[8px] bg-[linear-gradient(180deg,#395bff,#93a6ff)]" />
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-block rounded-full bg-[#f5f5f7] px-3 py-1 text-xs font-semibold text-[#0066cc]">
+                      {post.communityName}
+                    </span>
+                    <span className="inline-block rounded-full bg-[#f5f5f7] px-3 py-1 text-xs text-[rgba(0,0,0,0.8)]">
+                      {post.themeTitle}
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-bold tracking-[-0.02em] text-[#1d1d1f]">{post.title}</h3>
                   {post.imageUrl ? (
                     <img
                       src={post.imageUrl}
                       alt={post.title}
-                      className="h-44 w-full rounded-lg object-cover"
+                      className="h-44 w-full rounded-[8px] object-cover"
                     />
                   ) : null}
-                  <p className="text-xs text-[#4f5fcf]">{post.themeTitle}</p>
-                  <p className="text-sm text-[#4b5563]">{post.content}</p>
+                  <p className="line-clamp-3 text-sm text-[rgba(0,0,0,0.8)]">{post.content}</p>
                 </div>
               ))}
             </div>
 
-            <div className="mt-10 flex justify-center gap-4">
+            <div className="mt-4 flex justify-center gap-4">
               <button
                 disabled={currentPage === 1}
                 onClick={() => fetchPosts(selectedCommunity === "all" ? undefined : selectedCommunity, currentPage - 1)}
-                className="btn-secondary px-4 py-2 disabled:opacity-40"
+                className="btn-secondary px-5 py-2 disabled:opacity-40"
               >
                 Previous
               </button>
 
-              <span className="px-4 py-2 text-[#6b7280]">Page {currentPage}</span>
+              <span className="rounded-full bg-[#f5f5f7] px-4 py-2 text-sm text-[rgba(0,0,0,0.8)]">Page {currentPage}</span>
 
               <button
                 disabled={!hasMore}
                 onClick={() => fetchPosts(selectedCommunity === "all" ? undefined : selectedCommunity, currentPage + 1)}
-                className="btn-primary px-4 py-2 disabled:opacity-40"
+                className="btn-primary px-5 py-2 disabled:opacity-40"
               >
                 Next
               </button>
@@ -151,5 +159,6 @@ export default function HistoryPage() {
     </div>
   );
 }
+
 
 

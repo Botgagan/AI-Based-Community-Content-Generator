@@ -7,6 +7,7 @@ import { ThirdPartyPreBuiltUI } from "supertokens-auth-react/recipe/thirdparty/p
 import { PasswordlessPreBuiltUI } from "supertokens-auth-react/recipe/passwordless/prebuiltui";
 import { canHandleRoute, getRoutingComponent } from "supertokens-auth-react/ui";
 import { initSuperTokens } from "@/lib/supertokens";
+import PageLoader from "@/components/PageLoader";
 
 initSuperTokens();
 
@@ -47,7 +48,6 @@ export default function AuthPage() {
 
     checkSession();
 
-    // Keep checking while auth UI is open; this catches post-login session creation.
     const intervalId = window.setInterval(checkSession, 1000);
 
     return () => {
@@ -57,17 +57,25 @@ export default function AuthPage() {
   }, [router, searchParams]);
 
   if (loading) {
-    return (
-      <div className="bg-app-gradient flex min-h-screen items-center justify-center text-[#6b7280]">
-        Loading...
-      </div>
-    );
+    return <PageLoader label="Loading authentication..." />;
   }
 
   if (canHandleRoute([ThirdPartyPreBuiltUI, PasswordlessPreBuiltUI])) {
     return (
-      <div className="bg-app-gradient flex min-h-screen items-center justify-center px-4 py-12">
-        <div className="w-full max-w-md">{getRoutingComponent([ThirdPartyPreBuiltUI, PasswordlessPreBuiltUI])}</div>
+      <div className="grid min-h-screen items-center bg-[radial-gradient(circle_at_20%_0%,rgba(57,91,255,0.16),transparent_40%),linear-gradient(180deg,#f6f8ff,#edf2ff)] px-4 py-12 lg:grid-cols-2">
+        <div className="mx-auto hidden max-w-md lg:block">
+          <p className="text-xs uppercase tracking-[0.14em] text-[#667085]">Welcome</p>
+          <h1 className="mt-2 font-bold text-5xl font-bold leading-tight text-[#101828]">
+            Manage every community from one modern workspace.
+          </h1>
+          <p className="mt-4 text-base text-[#475467]">
+            Sign in to generate content, approve posts, and keep your social pipeline running.
+          </p>
+        </div>
+
+        <div className="mx-auto w-full max-w-md rounded-[20px] border border-[#dfe6ff] bg-white p-3 shadow-[0_30px_60px_rgba(16,24,40,0.16)]">
+          {getRoutingComponent([ThirdPartyPreBuiltUI, PasswordlessPreBuiltUI])}
+        </div>
       </div>
     );
   }

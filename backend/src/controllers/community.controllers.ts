@@ -9,6 +9,8 @@ import {
   updateCommunity,
   deleteCommunity,
   leaveCommunity,
+  joinCommunity,
+  getCommunityAdminStats,
 } from "../services/community.service.js";
 
 import { getPrimaryUserId } from "../utils/getPrimaryUserId.js";
@@ -59,12 +61,14 @@ export async function getCommunitiesController(
     const userId = await getPrimaryUserId(req);
 
     const { page, limit, all } = req.query;
+    const scope = req.query.scope === "directory" ? "directory" : "member";
 
     const communities = await getUserCommunities({
       userId,
       page: resolvePage(page, PAGINATION_DEFAULT_PAGE),
       limit: resolveLimit(limit, { fallback: PAGINATION_DEFAULT_LIMIT }),
       all: all === "true",
+      scope,
     });
 
     res.json({
@@ -75,6 +79,24 @@ export async function getCommunitiesController(
   } catch (err: any) {
     console.error("COMMUNITY LIST ERROR:", err);
     res.status(500).json({ message: err.message });
+  }
+}
+
+/* JOIN */
+export async function joinCommunityController(
+  req: Request & SessionRequest,
+  res: Response
+) {
+  try {
+    const userId = await getPrimaryUserId(req);
+    const { id } = req.params;
+
+    const result = await joinCommunity(id, userId);
+
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    console.error("join error :", err);
+    res.status(400).json({ message: err.message });
   }
 }
 
@@ -143,6 +165,22 @@ export async function leaveCommunityController(
     await leaveCommunity(id, userId);
 
     res.json({ success: true });
+  } catch (err: any) {
+    res.status(403).json({ message: err.message });
+  }
+}
+
+/* ADMIN STATS */
+export async function getCommunityAdminStatsController(
+  req: Request & SessionRequest,
+  res: Response
+) {
+  try {
+    const userId = await getPrimaryUserId(req);
+    const { id } = req.params;
+
+    const stats = await getCommunityAdminStats(id, userId);
+    res.json({ success: true, stats });
   } catch (err: any) {
     res.status(403).json({ message: err.message });
   }

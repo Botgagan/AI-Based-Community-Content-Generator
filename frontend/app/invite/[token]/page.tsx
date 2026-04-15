@@ -4,33 +4,32 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { url } from "@/lib/axiosInstance";
 import Session from "supertokens-auth-react/recipe/session";
+import { useUI } from "@/components/UIProvider";
+import PageLoader from "@/components/PageLoader";
 
 export default function InvitePage() {
   const { token } = useParams() as { token: string };
   const router = useRouter();
+  const { toast, showLoader, hideLoader } = useUI();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!token) return;
 
     const processInvite = async () => {
+      showLoader();
       try {
-        // Step 1: Validate invite
-        await url.get(`/api/invite/validate/${token}`);// /api/invite is a base route defined in the backend, and /validate/:token is the endpoint to validate the invite token. This step ensures that the token is valid before proceeding.
+        await url.get(`/api/invite/validate/${token}`);
 
-        // Step 2: Check session
         const hasSession = await Session.doesSessionExist();
 
         if (!hasSession) {
-          // Force login
-          router.replace(`/auth?redirectTo=/invite/${token}`);//
+          router.replace(`/auth?redirectTo=/invite/${token}`);
           return;
         }
 
-        // Step 3: Accept invite
         const res = await url.post(`/api/invite/accept/${token}`);
-
-        // Step 4: Redirect to community
+        toast({ title: "Invite accepted", variant: "success" });
         router.replace(`/community/${res.data.communityId}`);
       } catch (err: unknown) {
         const message =
@@ -41,21 +40,21 @@ export default function InvitePage() {
             ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
             : "Invalid invite";
 
-        alert(message);
+        toast({ title: "Invite invalid", description: message, variant: "error" });
         router.replace("/");
       } finally {
         setLoading(false);
+        hideLoader();
       }
     };
 
     processInvite();
-  }, [token, router]);
+  }, [token, router, toast, showLoader, hideLoader]);
 
   return (
-    <div className="bg-app-gradient min-h-screen flex items-center justify-center text-[#6b7280]">
-      {loading ? "Processing invite..." : null}
+    <div className="min-h-screen bg-[radial-gradient(circle_at_10%_0%,rgba(57,91,255,0.14),transparent_42%),linear-gradient(180deg,#f6f8ff,#edf2ff)]">
+      <PageLoader label={loading ? "Processing invite..." : "Redirecting..."} />
     </div>
   );
 }
-
 

@@ -37,27 +37,28 @@ export default function Sidebar() {
   }, []);
 
   return (
-    <aside className="hidden h-full w-64 border-r border-[#e5e7eb] bg-[#ffffff]/80 backdrop-blur md:flex md:flex-col md:min-h-0">
-      <div className="border-b border-[#e5e7eb] p-4">
-        <h2 className="text-lg font-semibold text-[#1f2937]">Communities</h2>
-      </div>
-
-      <div className="flex-1 space-y-2 overflow-y-auto p-3">
-        {communities.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => router.push(`/community/${c.id}`)}
-            className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition ${
-              pathname === `/community/${c.id}`
-                ? "border-[#c7d2fe] bg-[#e8edff] text-[#4f5fcf]"
-                : "border-transparent text-[#4b5563] hover:border-[#e5e7eb] hover:bg-[#eef2ff]"
-            }`}
-          >
-            {c.name}
-          </button>
-        ))}
+    <aside className="hidden h-[calc(100vh-126px)] overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white md:flex md:flex-col">
+      <div className="flex min-h-0 flex-1 flex-col p-3">
+        <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#6b7280]">Communities</p>
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+          {communities.map((community) => {
+            const active = pathname === `/community/${community.id}` || pathname.startsWith(`/community/${community.id}/`);
+            return (
+              <button
+                key={community.id}
+                onClick={() => router.push(`/community/${community.id}`)}
+                className={`w-full rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition ${
+                  active
+                    ? "border-[#cdd9ff] bg-[#dbe7fa] text-[#111827]"
+                    : "border-[#e5e7eb] bg-white text-[#374151] hover:bg-[#f9fafb]"
+                }`}
+              >
+                <span className="block truncate">{community.name}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </aside>
   );
 }
-

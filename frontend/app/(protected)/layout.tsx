@@ -11,16 +11,13 @@ export default function ProtectedLayout({
 }) {
   return (
     <SessionAuth requireAuth>
-      <div className="h-screen flex flex-col bg-app-gradient text-[#111827]">
+      <div className="app-shell">
         <NavbarComponent />
-
-        <div className="flex flex-1 overflow-hidden">
+        <section className="app-body">
           <Sidebar />
-          <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
-        </div>
+          <main className="app-content">{children}</main>
+        </section>
       </div>
     </SessionAuth>
   );
 }
-
-

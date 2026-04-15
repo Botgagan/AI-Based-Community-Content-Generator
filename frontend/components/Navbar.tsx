@@ -20,15 +20,9 @@ export default function Navbar() {
   const router = useRouter();
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  const [open, setOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [avatarBroken, setAvatarBroken] = useState(false);
-
-  const navLinks = [
-    { name: "Dashboard", href: "/dashboard" },
-    { name: "History", href: "/history" },
-  ];
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -73,49 +67,51 @@ export default function Navbar() {
       : "";
     return `${first}${second}`;
   }, [profile?.email, profile?.name]);
+  const topLinks = useMemo(
+    () => [
+      { label: "Dashboard", href: "/dashboard" },
+      { label: "History", href: "/history" },
+    ],
+    []
+  );
 
   const handleLogout = async () => {
     await Session.signOut();
     router.replace("/auth");
   };
 
-  const goToProfile = () => {
-    setProfileOpen(false);
-    setOpen(false);
-    router.push("/profile");
-  };
-
   return (
-    <nav className="sticky top-0 z-50 border-b border-[#e5e7eb] bg-[#ffffff]/95 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
-        <Link href="/dashboard" onClick={() => setOpen(false)}>
-          <div className="flex cursor-pointer items-center gap-3">
-            <Image src="/logo.png" alt="logo" width={40} height={40} className="object-contain" />
-            <span className="text-xl font-semibold text-[#111827] md:text-2xl">Hind Social</span>
-          </div>
+    <header className="relative z-40 overflow-visible rounded-2xl border border-[#e5e7eb] bg-white px-4 py-3 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:px-6">
+      <div className="flex items-center justify-between gap-4">
+        <Link href="/dashboard" className="flex items-center gap-2.5">
+          <Image src="/logo.png" alt="Hind Social" width={42} height={42} className="rounded-md border border-[#e5e7eb] p-1" />
+          <span className="text-2xl font-extrabold tracking-tight text-[#101828] sm:text-3xl">Hind Social</span>
         </Link>
 
-        <div className="hidden items-center gap-8 text-sm md:flex">
-          {navLinks.map((link) => (
-            <Link key={link.href} href={link.href}>
-              <span
-                className={`rounded-lg px-3 py-1.5 transition ${
-                  pathname === link.href
-                    ? "bg-[#e8edff] text-[#4f5fcf] font-semibold"
-                    : "text-[#6b7280] hover:bg-[#eef2ff] hover:text-[#111827]"
+        <nav className="mx-auto flex items-center gap-2 overflow-x-auto">
+          {topLinks.map((link) => {
+            const active = pathname === link.href;
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`whitespace-nowrap rounded-xl border px-3 py-1.5 text-sm font-semibold transition ${
+                  active
+                    ? "border-[#c7d2fe] bg-[#eef2ff] text-[#24358f]"
+                    : "border-transparent text-[#475467] hover:border-[#dbe4ff] hover:bg-[#f8faff]"
                 }`}
               >
-                {link.name}
-              </span>
-            </Link>
-          ))}
-        </div>
+                {link.label}
+              </Link>
+            );
+          })}
+        </nav>
 
         <div className="flex items-center gap-3">
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setProfileOpen((prev) => !prev)}
-              className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-[#d1d5db] bg-white text-sm font-semibold text-[#4b5563]"
+              className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-[#d0d5dd] bg-[#111827] text-xs font-bold text-white"
               aria-label="Profile menu"
             >
               {profile?.avatarUrl && !avatarBroken ? (
@@ -133,55 +129,28 @@ export default function Navbar() {
             </button>
 
             {profileOpen && (
-              <div className="absolute right-0 mt-2 w-44 rounded-xl border border-[#e5e7eb] bg-white p-1 shadow-md">
+              <div className="absolute right-0 top-[calc(100%+8px)] z-[80] w-52 rounded-xl border border-[#e5e7eb] bg-white p-1.5 shadow-[0_20px_48px_rgba(15,23,42,0.14)]">
                 <button
-                  onClick={goToProfile}
-                  className="w-full rounded-lg px-3 py-2 text-left text-sm text-[#374151] hover:bg-[#f3f4f6]"
+                  onClick={() => {
+                    setProfileOpen(false);
+                    router.push("/profile");
+                  }}
+                  className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-[#101828] hover:bg-[#f2f5ff]"
                 >
                   View Profile
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="w-full rounded-lg px-3 py-2 text-left text-sm text-rose-600 hover:bg-rose-50"
+                  className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-[#2c43b7] hover:bg-[#eef2ff]"
                 >
                   Logout
                 </button>
               </div>
             )}
           </div>
-
-          <button onClick={() => setOpen((prev) => !prev)} className="text-xl text-[#6b7280] md:hidden">
-            {open ? "x" : "="}
-          </button>
         </div>
       </div>
-
-      {open && (
-        <div className="border-t border-[#e5e7eb] bg-[#ffffff] px-6 py-5 md:hidden">
-          <div className="space-y-4">
-            {navLinks.map((link) => (
-              <Link key={link.href} href={link.href} onClick={() => setOpen(false)}>
-                <div
-                  className={`rounded-lg px-3 py-2 text-sm ${
-                    pathname === link.href
-                      ? "bg-[#e8edff] text-[#4f5fcf] font-semibold"
-                      : "text-[#6b7280]"
-                  }`}
-                >
-                  {link.name}
-                </div>
-              </Link>
-            ))}
-
-            <button onClick={goToProfile} className="btn-secondary w-full py-2 text-sm">
-              View Profile
-            </button>
-            <button onClick={handleLogout} className="btn-primary w-full py-2 text-sm">
-              Logout
-            </button>
-          </div>
-        </div>
-      )}
-    </nav>
+    </header>
   );
 }
+
