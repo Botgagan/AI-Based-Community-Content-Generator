@@ -66,14 +66,14 @@ export default function AuthPage() {
         <div className="mx-auto hidden max-w-md lg:block">
           <p className="text-xs uppercase tracking-[0.14em] text-[#667085]">Welcome</p>
           <h1 className="mt-2 font-bold text-5xl font-bold leading-tight text-[#101828]">
-            Manage every community from one modern workspace.
+            AI Based Community Content Generator
           </h1>
           <p className="mt-4 text-base text-[#475467]">
-            Sign in to generate content, approve posts, and keep your social pipeline running.
+            Sign in to generate community posts, review content, and manage your workflow from one place.
           </p>
         </div>
 
-        <div className="mx-auto w-full max-w-md rounded-[20px] border border-[#dfe6ff] bg-white p-3 shadow-[0_30px_60px_rgba(16,24,40,0.16)]">
+        <div className="mx-auto w-full max-w-md rounded-[20px] border border-[#dfe6ff] bg-transparent p-3 shadow-none">
           {getRoutingComponent([ThirdPartyPreBuiltUI, PasswordlessPreBuiltUI])}
         </div>
       </div>

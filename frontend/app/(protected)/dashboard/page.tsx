@@ -154,9 +154,9 @@ export default function DashboardPage() {
           </div>
         ) : (
           <>
-            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid items-stretch gap-5 sm:grid-cols-2 xl:grid-cols-3">
               {communities.map((community) => (
-                <div key={community.id} className="panel relative overflow-hidden p-5">
+                <div key={community.id} className="panel relative flex h-full flex-col overflow-hidden p-5">
                   <div className="absolute right-4 top-4 z-10 flex gap-2">
                     {community.role === "owner" && (
                       <>
@@ -189,19 +189,19 @@ export default function DashboardPage() {
                   )}
 
                   <h2 className="text-xl font-bold tracking-[-0.02em] text-[#1d1d1f]">{community.name}</h2>
-                  <p className="mt-2 line-clamp-3 text-sm text-[rgba(0,0,0,0.8)]">{community.description}</p>
+                  <p className="mt-2 flex-1 line-clamp-3 text-sm text-[rgba(0,0,0,0.8)]">{community.description}</p>
 
                   {community.isMember ? (
                     <button
                       onClick={() => router.push(`/community/${community.id}`)}
-                      className="btn-primary mt-6 w-full py-2.5 text-sm"
+                      className="btn-primary mt-auto w-full py-2.5 text-sm"
                     >
                       Open Community
                     </button>
                   ) : (
                     <button
                       onClick={() => handleJoin(community.id)}
-                      className="btn-secondary mt-6 w-full py-2.5 text-sm"
+                      className="btn-secondary mt-auto w-full py-2.5 text-sm"
                     >
                       Join Community
                     </button>

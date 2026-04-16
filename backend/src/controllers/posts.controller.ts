@@ -8,9 +8,6 @@ import {
   generatePostsFromTheme,
   regeneratePost,
   reviewPost,
-  schedulePostForFacebook,
-  getFacebookPostSchedules,
-  markFacebookScheduleShared,
 } from "../services/posts.service.js";
 
 import { getPrimaryUserId } from "../utils/getPrimaryUserId.js";
@@ -192,86 +189,3 @@ export async function reviewPostController(
   }
 }
 
-/* =============================
-   SCHEDULE POST TO FACEBOOK
-============================= */
-
-export async function schedulePostForFacebookController(
-  req: Request & SessionRequest,
-  res: Response
-) {
-  try {
-    const userId = await getPrimaryUserId(req);
-    const { id } = req.params;
-    const { scheduledAt, userTimezone } = req.body as {
-      scheduledAt?: string;
-      userTimezone?: string;
-    };
-
-    if (!id || !scheduledAt) {
-      return res.status(400).json({ message: "post id and scheduledAt are required" });
-    }
-
-    const schedule = await schedulePostForFacebook(
-      id,
-      scheduledAt,
-      userTimezone || "UTC",
-      userId
-    );
-
-    res.json({
-      success: true,
-      schedule,
-    });
-  } catch (err: any) {
-    res.status(400).json({ message: err.message });
-  }
-}
-
-/* =============================
-   GET FACEBOOK SCHEDULES
-============================= */
-
-export async function getFacebookPostSchedulesController(
-  req: Request & SessionRequest,
-  res: Response
-) {
-  try {
-    const userId = await getPrimaryUserId(req);
-    const { communityId } = req.query as { communityId?: string };
-    const schedules = await getFacebookPostSchedules(userId, communityId);
-
-    res.json({
-      success: true,
-      schedules,
-    });
-  } catch (err: any) {
-    res.status(400).json({ message: err.message });
-  }
-}
-
-/* =============================
-   MARK SCHEDULE AS SHARED
-============================= */
-
-export async function markFacebookScheduleSharedController(
-  req: Request & SessionRequest,
-  res: Response
-) {
-  try {
-    const userId = await getPrimaryUserId(req);
-    const { scheduleId } = req.params;
-
-    if (!scheduleId) {
-      return res.status(400).json({ message: "scheduleId is required" });
-    }
-
-    const schedule = await markFacebookScheduleShared(scheduleId, userId);
-    res.json({
-      success: true,
-      schedule,
-    });
-  } catch (err: any) {
-    res.status(400).json({ message: err.message });
-  }
-}

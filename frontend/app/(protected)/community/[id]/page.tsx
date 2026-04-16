@@ -45,16 +45,6 @@ type Post = {
   themeTitle: string;
 };
 
-type PostSchedule = {
-  id: string;
-  postId: string;
-  status: "scheduled" | "ready_to_share" | "shared" | "failed" | "cancelled";
-  scheduledAt: string;
-  userTimezone: string;
-  facebookShareUrl?: string | null;
-  errorMessage?: string | null;
-};
-
 const iconActionButtonClass =
   "flex h-8 w-8 items-center justify-center rounded-full border border-[#d0d5dd] bg-white text-[#374151] transition hover:bg-[#f3f4f6] disabled:cursor-not-allowed disabled:opacity-60";
 
@@ -98,18 +88,6 @@ function CalendarIcon() {
   );
 }
 
-function ShareIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M14 5h5v5" />
-      <path d="M10 14L19 5" />
-      <path d="M19 14v5h-5" />
-      <path d="M5 10V5h5" />
-      <path d="M5 19h5v-5" />
-    </svg>
-  );
-}
-
 export default function CommunityDetailPage() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
@@ -131,7 +109,10 @@ export default function CommunityDetailPage() {
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
   const [scheduleSubmitting, setScheduleSubmitting] = useState(false);
-  const [postSchedules, setPostSchedules] = useState<Record<string, PostSchedule>>({});
+
+  const [showPostDetailsModal, setShowPostDetailsModal] = useState(false);
+  const [selectedPostForModal, setSelectedPostForModal] = useState<Post | null>(null);
+  const [showCommunityDescriptionModal, setShowCommunityDescriptionModal] = useState(false);
 
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editPrompt, setEditPrompt] = useState("");
@@ -199,28 +180,14 @@ export default function CommunityDetailPage() {
     setPostsHasMore(hasNextPageByLength(data.length, PAGINATION_DEFAULT_LIMIT));
   };
 
-  const fetchPostSchedules = async () => {
-    const res = await url.get(`/api/posts/schedules?communityId=${id}`);
-    const schedules = (res.data.schedules || []) as PostSchedule[];
-
-    const latestByPost: Record<string, PostSchedule> = {};
-    for (const schedule of schedules) {
-      if (!latestByPost[schedule.postId]) {
-        latestByPost[schedule.postId] = schedule;
-      }
-    }
-    setPostSchedules(latestByPost);
-  };
-
   useEffect(() => {
     const init = async () => {
-      const [communityRes, themesRes, nextThemesRes, postsRes, allThemesRes, schedulesRes] = await Promise.all([
+      const [communityRes, themesRes, nextThemesRes, postsRes, allThemesRes] = await Promise.all([
         url.get(`/api/community/${id}`),
         url.get(`/api/themes?communityId=${id}&page=${PAGINATION_DEFAULT_PAGE}&limit=${PAGINATION_DEFAULT_LIMIT}`),
         url.get(`/api/themes?communityId=${id}&page=${PAGINATION_DEFAULT_PAGE + 1}&limit=${PAGINATION_DEFAULT_LIMIT}`),
         url.get(`/api/posts?communityId=${id}&page=${PAGINATION_DEFAULT_PAGE}&limit=${PAGINATION_DEFAULT_LIMIT}`),
         url.get(`/api/themes?communityId=${id}&limit=${THEMES_ALL_FETCH_LIMIT}`),
-        url.get(`/api/posts/schedules?communityId=${id}`),
       ]);
 
       const initialThemes = themesRes.data.themes || [];
@@ -235,14 +202,6 @@ export default function CommunityDetailPage() {
       setPostsPage(PAGINATION_DEFAULT_PAGE);
       setPostsHasMore(hasNextPageByLength(initialPosts.length, PAGINATION_DEFAULT_LIMIT));
       setAllThemes(allThemesRes.data.themes || []);
-      const schedules = (schedulesRes.data.schedules || []) as PostSchedule[];
-      const latestByPost: Record<string, PostSchedule> = {};
-      for (const schedule of schedules) {
-        if (!latestByPost[schedule.postId]) {
-          latestByPost[schedule.postId] = schedule;
-        }
-      }
-      setPostSchedules(latestByPost);
     };
 
     init();
@@ -256,11 +215,6 @@ export default function CommunityDetailPage() {
         });
       }
 
-      if (activeTab === "posts") {
-        fetchPostSchedules().catch((error) => {
-          console.error("Failed to refresh schedules", error);
-        });
-      }
     }, 8000);
 
     return () => clearInterval(timer);
@@ -479,41 +433,36 @@ export default function CommunityDetailPage() {
 
     try {
       setScheduleSubmitting(true);
-      await url.post(`/api/posts/${selectedSchedulePostId}/schedule-facebook`, {
-        scheduledAt: scheduledAt.toISOString(),
-        userTimezone: localTimezone,
+      toast({
+        title: "Scheduling disabled",
+        description: "Facebook scheduling is currently unavailable.",
+        variant: "error",
       });
-      await fetchPostSchedules();
       setShowScheduleModal(false);
       setSelectedSchedulePostId(null);
-      toast({ title: "Facebook schedule created", variant: "success" });
-    } catch (error) {
-      const err = error as AxiosError<{ message?: string }>;
-      toast({ title: "Scheduling failed", description: err.response?.data?.message || "Failed to schedule Facebook post.", variant: "error" });
     } finally {
       setScheduleSubmitting(false);
     }
   };
 
-  const openFacebookShareFromSchedule = async (schedule: PostSchedule) => {
-    if (!schedule.facebookShareUrl) {
-      toast({ title: "Share link not ready", description: "Please try again shortly.", variant: "error" });
-      return;
-    }
-
-    window.open(schedule.facebookShareUrl, "_blank", "noopener,noreferrer");
-
-    try {
-      await url.patch(`/api/posts/schedules/${schedule.id}/shared`);
-      await fetchPostSchedules();
-    } catch {
-      // non-blocking
-    }
+  const openPostDetailsModal = (post: Post) => {
+    setSelectedPostForModal(post);
+    setShowPostDetailsModal(true);
   };
+
+  const closePostDetailsModal = () => {
+    setShowPostDetailsModal(false);
+    setSelectedPostForModal(null);
+  };
+
+  const openCommunityDescriptionModal = () => setShowCommunityDescriptionModal(true);
+  const closeCommunityDescriptionModal = () => setShowCommunityDescriptionModal(false);
 
   if (!community) {
     return <PageLoader label="Loading community..." />;
   }
+
+  const shouldClampCommunityDescription = community.description.trim().length > 200;
 
   return (
     <div className="px-1 py-2">
@@ -544,7 +493,23 @@ export default function CommunityDetailPage() {
               ) : null}
               <p className="text-xs uppercase tracking-[0.14em] text-[rgba(0,0,0,0.8)]">Community Workspace</p>
               <h1 className="mt-2 text-3xl font-extrabold tracking-[-0.02em] text-[#1d1d1f]">{community.name}</h1>
-              <p className="mt-1 text-sm text-[rgba(0,0,0,0.8)]">{community.description}</p>
+              <div className="mt-1 space-y-1">
+                <p
+                  className={`text-sm text-[rgba(0,0,0,0.8)] ${shouldClampCommunityDescription ? "line-clamp-3 cursor-pointer" : ""}`}
+                  onClick={shouldClampCommunityDescription ? openCommunityDescriptionModal : undefined}
+                >
+                  {community.description}
+                </p>
+                {shouldClampCommunityDescription ? (
+                  <button
+                    type="button"
+                    onClick={openCommunityDescriptionModal}
+                    className="text-left text-sm font-semibold text-[#0066cc] hover:underline"
+                  >
+                    Read more
+                  </button>
+                ) : null}
+              </div>
             </div>
 
             <div className={`grid w-full gap-2 xl:max-w-xl ${canAccessAdminPanel ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
@@ -614,38 +579,44 @@ export default function CommunityDetailPage() {
             )}
 
             {posts.length > 0 && (
-              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid items-stretch gap-5 sm:grid-cols-2 xl:grid-cols-3">
                 {posts.map((post) => {
-                  const schedule = postSchedules[post.id];
-                  const formattedScheduleTime = schedule?.scheduledAt
-                    ? new Date(schedule.scheduledAt).toLocaleString([], {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      })
-                    : "";
-
                   return (
-                    <div key={post.id} className="panel relative space-y-3 rounded-[8px] p-5">
+                    <div
+                      key={post.id}
+                      className="panel relative flex h-full flex-col space-y-3 rounded-[8px] p-5"
+                      onClick={() => {
+                        if (editingPostId === post.id) return;
+                        openPostDetailsModal(post);
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          if (editingPostId === post.id) return;
+                          openPostDetailsModal(post);
+                        }
+                      }}
+                    >
                     {editingPostId !== post.id && (
                       <div className="absolute right-4 top-4 z-10 flex items-center gap-1.5">
                         {post.status === "approved" ? (
-                          schedule?.status === "ready_to_share" ? (
-                            <button
-                              onClick={() => openFacebookShareFromSchedule(schedule)}
-                              className={iconActionButtonClass}
-                              title="Post to Facebook"
-                            >
-                              <ShareIcon />
-                            </button>
-                          ) : (
-                            <button onClick={() => openScheduleModal(post.id)} className={iconActionButtonClass} title="Schedule">
-                              <CalendarIcon />
-                            </button>
-                          )
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openScheduleModal(post.id);
+                            }}
+                            className={iconActionButtonClass}
+                            title="Schedule"
+                          >
+                            <CalendarIcon />
+                          </button>
                         ) : (
                           <>
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setEditingPostId(post.id);
                                 setEditPrompt(post.content);
                               }}
@@ -654,11 +625,21 @@ export default function CommunityDetailPage() {
                             >
                               <EditIcon />
                             </button>
-                            <button onClick={() => deletePost(post.id)} className={iconActionButtonClass} title="Delete">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deletePost(post.id);
+                              }}
+                              className={iconActionButtonClass}
+                              title="Delete"
+                            >
                               <DeleteIcon />
                             </button>
                             <button
-                              onClick={() => regeneratePost(post.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                regeneratePost(post.id);
+                              }}
                               disabled={regeneratingPostId === post.id}
                               className={iconActionButtonClass}
                               title={regeneratingPostId === post.id ? "Regenerating..." : "Regenerate"}
@@ -683,38 +664,21 @@ export default function CommunityDetailPage() {
                       >
                         {post.status || "pending"}
                       </span>
-                      {post.status === "approved" && schedule?.status ? (
-                        <span
-                          className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${
-                            schedule.status === "ready_to_share"
-                              ? "bg-[#111827] text-white"
-                              : schedule.status === "shared"
-                                ? "bg-[#dcfce7] text-[#166534]"
-                                : schedule.status === "failed"
-                                  ? "bg-[#fee2e2] text-[#991b1b]"
-                                  : "bg-[#e0e7ff] text-[#3730a3]"
-                          }`}
-                        >
-                          {schedule.status === "scheduled"
-                            ? `Scheduled: ${formattedScheduleTime}`
-                            : schedule.status === "ready_to_share"
-                              ? "Ready to share"
-                              : schedule.status === "shared"
-                                ? "Shared to Facebook"
-                                : schedule.status === "failed"
-                                  ? "Schedule failed"
-                                  : schedule.status}
-                        </span>
-                      ) : null}
                     </div>
 
-                    <h3 className="text-xl font-bold tracking-[-0.02em] text-[#1d1d1f]">{post.title}</h3>
+                    <h3 className="min-h-[3.6rem] line-clamp-2 text-xl font-bold tracking-[-0.02em] text-[#1d1d1f]">
+                      {post.title}
+                    </h3>
 
                     {post.imageUrl ? (
                       <img src={post.imageUrl} alt={post.title} className="h-52 w-full rounded-[8px] object-cover" />
                     ) : (
-                      <div className="rounded-[8px] border border-dashed border-white/70 bg-white/50 px-3 py-4 text-xs text-[rgba(0,0,0,0.8)]">
-                        Image generating...
+                      <div className="relative flex h-52 items-center justify-center overflow-hidden rounded-[8px] border border-dashed border-white/70 bg-white/50 px-3 py-4">
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,113,227,0.22),transparent_60%)] opacity-70 animate-pulse" />
+                        <div className="relative flex flex-col items-center justify-center gap-2">
+                          <div className="h-12 w-12 animate-spin rounded-full border-[3px] border-[#0071e3]/20 border-t-[#0071e3]" />
+                          <p className="text-xs font-semibold text-[rgba(0,0,0,0.8)]">Generating image...</p>
+                        </div>
                       </div>
                     )}
 
@@ -738,13 +702,10 @@ export default function CommunityDetailPage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="flex-1 space-y-2">
                         <p className="line-clamp-3 text-sm text-[rgba(0,0,0,0.8)]">{post.content}</p>
                         {post.status === "rejected" && post.rejectionReason ? (
                           <p className="text-xs text-[#1d1d1f]">Rejection reason: {post.rejectionReason}</p>
-                        ) : null}
-                        {post.status === "approved" && postSchedules[post.id]?.status === "failed" && postSchedules[post.id]?.errorMessage ? (
-                          <p className="text-xs text-[#991b1b]">{postSchedules[post.id]?.errorMessage}</p>
                         ) : null}
                       </div>
                     )}
@@ -913,7 +874,7 @@ export default function CommunityDetailPage() {
       >
         <DialogTitle>Schedule Facebook Post</DialogTitle>
         <DialogDescription>
-          Set the date and time for this approved post. At scheduled time, it will become ready for Facebook sharing.
+          Set the date and time for this approved post. Scheduling is currently disabled.
         </DialogDescription>
 
         <div className="mt-4 space-y-3">
@@ -960,6 +921,56 @@ export default function CommunityDetailPage() {
             className="btn-primary px-4 py-2 text-sm disabled:opacity-60"
           >
             {scheduleSubmitting ? "Scheduling..." : "Schedule Post"}
+          </button>
+        </DialogFooter>
+      </Dialog>
+
+      <Dialog open={showPostDetailsModal} onClose={closePostDetailsModal} className="max-w-2xl">
+        <DialogTitle>{selectedPostForModal?.title || "Post Details"}</DialogTitle>
+        <DialogDescription>
+          {selectedPostForModal?.themeTitle ? `Theme: ${selectedPostForModal.themeTitle}` : " "}{" "}
+          {selectedPostForModal?.status ? `• Status: ${selectedPostForModal.status}` : ""}
+        </DialogDescription>
+
+        <div className="mt-4 space-y-3">
+          {selectedPostForModal?.imageUrl ? (
+            <img
+              src={selectedPostForModal.imageUrl}
+              alt={selectedPostForModal.title}
+              className="h-72 w-full rounded-[8px] object-cover"
+            />
+          ) : (
+            <div className="flex h-72 items-center justify-center rounded-[8px] border border-dashed border-white/70 bg-white/50 text-xs text-[rgba(0,0,0,0.8)]">
+              Image generating...
+            </div>
+          )}
+
+          <p className="whitespace-pre-wrap text-sm text-[rgba(0,0,0,0.8)]">{selectedPostForModal?.content}</p>
+
+          {selectedPostForModal?.status === "rejected" && selectedPostForModal.rejectionReason ? (
+            <p className="text-sm text-[#1d1d1f]">
+              <span className="font-semibold text-[#991b1b]">Rejection reason: </span>
+              {selectedPostForModal.rejectionReason}
+            </p>
+          ) : null}
+        </div>
+
+        <DialogFooter>
+          <button onClick={closePostDetailsModal} className="btn-primary px-4 py-2 text-sm">
+            Close
+          </button>
+        </DialogFooter>
+      </Dialog>
+
+      <Dialog open={showCommunityDescriptionModal} onClose={closeCommunityDescriptionModal} className="max-w-2xl">
+        <DialogTitle>Community Description</DialogTitle>
+        <DialogDescription>{community?.name}</DialogDescription>
+        <div className="mt-4">
+          <p className="whitespace-pre-wrap text-sm text-[rgba(0,0,0,0.8)]">{community?.description}</p>
+        </div>
+        <DialogFooter>
+          <button onClick={closeCommunityDescriptionModal} className="btn-primary px-4 py-2 text-sm">
+            Close
           </button>
         </DialogFooter>
       </Dialog>

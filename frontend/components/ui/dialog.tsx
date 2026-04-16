@@ -17,7 +17,11 @@ export function Dialog({ open, onClose, children, className }: DialogProps) {
     <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className={cn("w-full max-w-lg rounded-[8px] border-0 bg-white p-5 shadow-[rgba(0,0,0,0.22)_3px_5px_30px_0px] sm:p-6", className)}
+        className={cn(
+          "w-full max-w-lg rounded-[8px] border-0 bg-white p-5 shadow-[rgba(0,0,0,0.22)_3px_5px_30px_0px] sm:p-6",
+          "max-h-[calc(100vh-2rem)] overflow-y-auto",
+          className
+        )}
       >
         {children}
       </div>

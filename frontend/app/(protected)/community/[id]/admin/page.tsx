@@ -7,6 +7,7 @@ import FilterSelect from "@/components/FilterSelect";
 import { useUI } from "@/components/UIProvider";
 import PageLoader from "@/components/PageLoader";
 import ThemeFormModal from "@/components/ThemeFormModal";
+import { Dialog, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { AxiosError } from "axios";
 
 type Community = {
@@ -104,6 +105,7 @@ export default function CommunityAdminPage() {
 
   const [activeTab, setActiveTab] = useState<"themes" | "posts">("themes");
   const [editingTheme, setEditingTheme] = useState<Theme | null>(null);
+  const [selectedPostForModal, setSelectedPostForModal] = useState<Post | null>(null);
 
   const [themeSearch, setThemeSearch] = useState("");
   const [postSearch, setPostSearch] = useState("");
@@ -284,6 +286,9 @@ export default function CommunityAdminPage() {
     [themes]
   );
 
+  const openPostDetailsModal = (post: Post) => setSelectedPostForModal(post);
+  const closePostDetailsModal = () => setSelectedPostForModal(null);
+
   if (!community) {
     return <PageLoader label="Loading admin panel..." />;
   }
@@ -371,9 +376,9 @@ export default function CommunityAdminPage() {
               <div className="panel rounded-[8px] p-10 text-center text-[rgba(0,0,0,0.8)]">No themes match this search/filter.</div>
             ) : (
               filteredThemes.map((theme) => (
-                <div key={theme.id} className="panel rounded-[8px] p-5">
+                <div key={theme.id} className="panel flex h-full flex-col rounded-[8px] p-5">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="space-y-2">
+                    <div className="min-w-0 flex-1 space-y-2">
                       <div className="flex flex-wrap items-center gap-2 text-xs">
                         <span className="rounded-full bg-[#f5f5f7] px-2.5 py-1 font-semibold text-[#0066cc]">
                           {theme.source === "ai" ? "AI-suggested" : "Custom"}
@@ -383,10 +388,10 @@ export default function CommunityAdminPage() {
                       </div>
 
                       <h3 className="text-xl font-bold tracking-[-0.02em] text-[#1d1d1f]">{theme.title}</h3>
-                      <p className="text-sm text-[rgba(0,0,0,0.8)]">{theme.description}</p>
+                      <p className="line-clamp-3 text-sm text-[rgba(0,0,0,0.8)]">{theme.description}</p>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex shrink-0 flex-wrap gap-2">
                       <button
                         onClick={() => setEditingTheme(theme)}
                         className="btn-secondary px-3 py-2 text-xs"
@@ -448,13 +453,28 @@ export default function CommunityAdminPage() {
             {filteredPosts.length === 0 ? (
               <div className="panel rounded-[8px] p-10 text-center text-[rgba(0,0,0,0.8)]">No posts match this queue filter.</div>
             ) : (
-              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid items-stretch gap-5 sm:grid-cols-2 xl:grid-cols-3">
                 {filteredPosts.map((post) => (
-                  <div key={post.id} className="panel relative space-y-3 rounded-[8px] p-5">
+                  <div
+                    key={post.id}
+                    className="panel relative flex h-full flex-col space-y-3 rounded-[8px] p-5"
+                    onClick={() => openPostDetailsModal(post)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openPostDetailsModal(post);
+                      }
+                    }}
+                  >
                     <div className="absolute right-4 top-4 z-10 flex items-center gap-1.5">
                       {post.status !== "approved" ? (
                         <button
-                          onClick={() => reviewPost(post.id, "approved")}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            reviewPost(post.id, "approved");
+                          }}
                           className={reviewIconButtonClass}
                           title="Approve"
                         >
@@ -463,7 +483,10 @@ export default function CommunityAdminPage() {
                       ) : null}
                       {post.status !== "rejected" ? (
                         <button
-                          onClick={() => reviewPost(post.id, "rejected")}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            reviewPost(post.id, "rejected");
+                          }}
                           className={reviewIconButtonClass}
                           title="Reject"
                         >
@@ -476,9 +499,17 @@ export default function CommunityAdminPage() {
                       <span className="rounded-full bg-[#f5f5f7] px-2.5 py-1 font-semibold text-[#0066cc]">{post.themeTitle}</span>
                       <span className="rounded-full bg-[#f5f5f7] px-2.5 py-1 text-[rgba(0,0,0,0.8)]">{post.status || "pending"}</span>
                     </div>
-                    <h3 className="text-xl font-bold tracking-[-0.02em] text-[#1d1d1f]">{post.title}</h3>
-                    {post.imageUrl ? <img src={post.imageUrl} alt={post.title} className="h-52 w-full rounded-[8px] object-cover" /> : null}
-                    <p className="line-clamp-3 text-sm text-[rgba(0,0,0,0.8)]">{post.content}</p>
+                    <h3 className="min-h-[3.6rem] line-clamp-2 text-xl font-bold tracking-[-0.02em] text-[#1d1d1f]">{post.title}</h3>
+                    {post.imageUrl ? (
+                      <img src={post.imageUrl} alt={post.title} className="h-52 w-full rounded-[8px] object-cover" />
+                    ) : (
+                      <div className="flex h-52 items-center justify-center rounded-[8px] border border-dashed border-white/70 bg-white/50 text-xs text-[rgba(0,0,0,0.8)]">
+                        No image available
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <p className="line-clamp-3 text-sm text-[rgba(0,0,0,0.8)]">{post.content}</p>
+                    </div>
                     {post.status === "rejected" && post.rejectionReason ? <p className="text-xs text-[#1d1d1f]">Reason: {post.rejectionReason}</p> : null}
                   </div>
                 ))}
@@ -503,6 +534,42 @@ export default function CommunityAdminPage() {
         onClose={() => setEditingTheme(null)}
         onSubmit={saveThemeEdit}
       />
+      <Dialog open={Boolean(selectedPostForModal)} onClose={closePostDetailsModal} className="max-w-2xl">
+        <DialogTitle>{selectedPostForModal?.title || "Post Details"}</DialogTitle>
+        <DialogDescription>
+          {selectedPostForModal?.themeTitle ? `Theme: ${selectedPostForModal.themeTitle}` : " "}{" "}
+          {selectedPostForModal?.status ? `• Status: ${selectedPostForModal.status}` : ""}
+        </DialogDescription>
+
+        <div className="mt-4 space-y-3">
+          {selectedPostForModal?.imageUrl ? (
+            <img
+              src={selectedPostForModal.imageUrl}
+              alt={selectedPostForModal.title}
+              className="h-72 w-full rounded-[8px] object-cover"
+            />
+          ) : (
+            <div className="flex h-72 items-center justify-center rounded-[8px] border border-dashed border-white/70 bg-white/50 text-xs text-[rgba(0,0,0,0.8)]">
+              No image available
+            </div>
+          )}
+
+          <p className="whitespace-pre-wrap text-sm text-[rgba(0,0,0,0.8)]">{selectedPostForModal?.content}</p>
+
+          {selectedPostForModal?.status === "rejected" && selectedPostForModal.rejectionReason ? (
+            <p className="text-sm text-[#1d1d1f]">
+              <span className="font-semibold text-[#991b1b]">Rejection reason: </span>
+              {selectedPostForModal.rejectionReason}
+            </p>
+          ) : null}
+        </div>
+
+        <DialogFooter>
+          <button onClick={closePostDetailsModal} className="btn-primary px-4 py-2 text-sm">
+            Close
+          </button>
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 }
