@@ -3,10 +3,15 @@ import { posts } from "../db/posts.schema.js";
 import { themes } from "../db/themes.schema.js";
 import { communities } from "../db/community.schema.js";
 import { communityMembers } from "../db/communityMembers.schema.js";
+import { postSchedules } from "../db/postSchedules.schema.js";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { generateAIPosts } from "../ai/posts.generator.js";
 import { enqueuePostImageJob } from "../queue/image.queue.js";
+import {
+  getFacebookPublishStatus,
+  scheduleFacebookPhotoPost,
+} from "./facebook.service.js";
 import {
   PAGINATION_DEFAULT_LIMIT,
   PAGINATION_DEFAULT_PAGE,
@@ -75,8 +80,78 @@ export async function getPosts({
     .orderBy(desc(posts.createdAt))
     .limit(limit)
     .offset(offset);
+  const rows = await query;
 
-  return query;
+  if (!rows.length) {
+    return rows;
+  }
+
+  const postIds = rows.map((row) => row.id);
+  const schedules = await db
+    .select({
+      id: postSchedules.id,
+      postId: postSchedules.postId,
+      status: postSchedules.status,
+      scheduledAt: postSchedules.scheduledAt,
+      platform: postSchedules.platform,
+      facebookShareUrl: postSchedules.facebookShareUrl,
+      createdAt: postSchedules.createdAt,
+    })
+    .from(postSchedules)
+    .where(inArray(postSchedules.postId, postIds))
+    .orderBy(desc(postSchedules.createdAt));
+
+  const now = new Date();
+
+  for (const schedule of schedules) {
+    if (
+      schedule.status === "scheduled" &&
+      schedule.facebookShareUrl &&
+      schedule.scheduledAt <= now
+    ) {
+      const currentStatus = await getFacebookPublishStatus(schedule.facebookShareUrl);
+      if (currentStatus === "published") {
+        await db
+          .update(postSchedules)
+          .set({
+            status: "published",
+            processedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(postSchedules.id, schedule.id));
+        schedule.status = "published";
+      }
+    }
+  }
+
+  const latestScheduleByPostId = new Map<
+    string,
+    { status: string; scheduledAt: Date; platform: string }
+  >();
+
+  for (const schedule of schedules) {
+    if (!latestScheduleByPostId.has(schedule.postId)) {
+      latestScheduleByPostId.set(schedule.postId, {
+        status: schedule.status,
+        scheduledAt: schedule.scheduledAt,
+        platform: schedule.platform,
+      });
+    }
+  }
+
+  return rows.map((row) => {
+    const schedule = latestScheduleByPostId.get(row.id);
+    return {
+      ...row,
+      facebookSchedule: schedule
+        ? {
+            status: schedule.status,
+            scheduledAt: schedule.scheduledAt,
+            platform: schedule.platform,
+          }
+        : null,
+    };
+  });
 }
 
 /* =============================
@@ -348,3 +423,43 @@ export async function reviewPost(
   return updated;
 }
 
+export async function scheduleApprovedPostToFacebook(
+  postId: string,
+  scheduledAt: Date,
+  userId: string,
+  userTimezone: string = "UTC"
+) {
+  const post = await verifyPostOwnerAccess(postId, userId);
+
+  if (post.status !== "approved") {
+    throw new Error("Only approved posts can be scheduled.");
+  }
+
+  if (!post.imageUrl) {
+    throw new Error("Post image is still generating. Please schedule after image is ready.");
+  }
+
+  const result = await scheduleFacebookPhotoPost({
+    caption: post.content,
+    imageUrl: post.imageUrl,
+    scheduledAt,
+  });
+
+  await db.insert(postSchedules).values({
+    postId: post.id,
+    userId,
+    platform: "facebook",
+    targetType: "page",
+    status: "scheduled",
+    scheduledAt,
+    userTimezone,
+    facebookShareUrl: result.post_id || result.id || null,
+    processedAt: new Date(),
+  });
+
+  return {
+    scheduledAt: scheduledAt.toISOString(),
+    facebookPostId: result.post_id || result.id || null,
+    status: "scheduled",
+  };
+}

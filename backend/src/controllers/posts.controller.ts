@@ -8,6 +8,7 @@ import {
   generatePostsFromTheme,
   regeneratePost,
   reviewPost,
+  scheduleApprovedPostToFacebook,
 } from "../services/posts.service.js";
 
 import { getPrimaryUserId } from "../utils/getPrimaryUserId.js";
@@ -189,3 +190,31 @@ export async function reviewPostController(
   }
 }
 
+export async function schedulePostToFacebookController(
+  req: Request & SessionRequest,
+  res: Response
+) {
+  try {
+    const userId = await getPrimaryUserId(req);
+    const { id } = req.params;
+    const { scheduledAt, timezone } = req.body as { scheduledAt?: string; timezone?: string };
+
+    if (!id || !scheduledAt) {
+      return res.status(400).json({ message: "post id and scheduledAt are required" });
+    }
+
+    const parsed = new Date(scheduledAt);
+    if (Number.isNaN(parsed.getTime())) {
+      return res.status(400).json({ message: "Invalid scheduledAt datetime" });
+    }
+
+    const result = await scheduleApprovedPostToFacebook(id, parsed, userId, timezone || "UTC");
+
+    res.json({
+      success: true,
+      schedule: result,
+    });
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
+}

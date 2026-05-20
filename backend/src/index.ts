@@ -23,11 +23,25 @@ export const db = drizzle(pool);
 
 const app = express();
 
+async function ensureSuperTokensCoreReachable() {
+  const coreUri = process.env.SUPERTOKENS_CONNECTION_URI || "http://localhost:3567";
+
+  try {
+    const response = await fetch(`${coreUri}/hello`);
+    if (!response.ok) {
+      throw new Error(`Unexpected status ${response.status}`);
+    }
+  } catch (error) {
+    console.error(`SuperTokens Core is not reachable at ${coreUri}.`);
+    console.error("Start SuperTokens Core first (for example: docker compose up -d supertokens postgres).");
+    throw error;
+  }
+}
+
 /* ---------------- BODY PARSER ---------------- */
 app.use(express.json());
 
 /* ---------------- CORS ---------------- */
-
 app.use(
   cors({
     origin: process.env.WEBSITE_DOMAIN,
@@ -36,15 +50,14 @@ app.use(
   })
 );
 
+/* ---------------- SUPERTOKENS ---------------- */
+app.use(supertokensMiddleware());
+
 app.use("/api/community", communityRoutes);
 app.use("/api/themes", themesRoutes);
 app.use("/api/invite", inviteRoutes);
 app.use("/api/posts", postsRoutes);
 app.use("/api/user", userRoutes);
-
-/* ---------------- SUPERTOKENS ---------------- */
-
-app.use(supertokensMiddleware());
 
 /* ---------------- TEST ROUTE ---------------- */
 
@@ -60,7 +73,16 @@ app.use(supertokensErrorHandler());
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  startImageWorker();
+async function startServer() {
+  await ensureSuperTokensCoreReachable();
+
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+    startImageWorker();
+  });
+}
+
+startServer().catch((error) => {
+  console.error("Server startup failed:", error);
+  process.exit(1);
 });

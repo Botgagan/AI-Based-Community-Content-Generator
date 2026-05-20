@@ -41,6 +41,11 @@ type Post = {
   imageUrl?: string | null;
   status?: "pending" | "approved" | "rejected";
   rejectionReason?: string | null;
+  facebookSchedule?: {
+    status: string;
+    scheduledAt: string;
+    platform: string;
+  } | null;
   themeId: string;
   themeTitle: string;
 };
@@ -433,13 +438,43 @@ export default function CommunityDetailPage() {
 
     try {
       setScheduleSubmitting(true);
+      const res = await url.patch(`/api/posts/${selectedSchedulePostId}/schedule-facebook`, {
+        scheduledAt: scheduledAt.toISOString(),
+        timezone: localTimezone,
+      });
+      const scheduledIso = res.data?.schedule?.scheduledAt as string | undefined;
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.id === selectedSchedulePostId
+            ? {
+                ...post,
+                facebookSchedule: {
+                  status: "scheduled",
+                  scheduledAt: scheduledIso || scheduledAt.toISOString(),
+                  platform: "facebook",
+                },
+              }
+            : post
+        )
+      );
       toast({
-        title: "Scheduling disabled",
-        description: "Facebook scheduling is currently unavailable.",
-        variant: "error",
+        title: "Post scheduled",
+        description: scheduledIso
+          ? `Facebook publish time: ${new Date(scheduledIso).toLocaleString()}`
+          : "Facebook post scheduled successfully.",
+        variant: "success",
       });
       setShowScheduleModal(false);
       setSelectedSchedulePostId(null);
+      setScheduleDate("");
+      setScheduleTime("");
+    } catch (error) {
+      const err = error as AxiosError<{ message?: string }>;
+      toast({
+        title: "Scheduling failed",
+        description: err.response?.data?.message || "Unable to schedule this Facebook post.",
+        variant: "error",
+      });
     } finally {
       setScheduleSubmitting(false);
     }
@@ -486,11 +521,17 @@ export default function CommunityDetailPage() {
         </div>
 
         <div className="panel overflow-hidden p-5 sm:p-6">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_520px] xl:items-start">
             <div className="min-w-0">
               {community.imageUrl ? (
-                <img src={community.imageUrl} alt={community.name} className="mb-4 h-48 w-full max-w-2xl rounded-[8px] object-cover" />
-              ) : null}
+                <img
+                  src={community.imageUrl}
+                  alt={community.name}
+                  className="mb-4 h-52 w-full rounded-[8px] object-cover"
+                />
+              ) : (
+                <div className="mb-4 h-52 w-full rounded-[8px] bg-[linear-gradient(135deg,#e8eeff,#f6f8ff)]" />
+              )}
               <p className="text-xs uppercase tracking-[0.14em] text-[rgba(0,0,0,0.8)]">Community Workspace</p>
               <h1 className="mt-2 text-3xl font-extrabold tracking-[-0.02em] text-[#1d1d1f]">{community.name}</h1>
               <div className="mt-1 space-y-1">
@@ -512,9 +553,9 @@ export default function CommunityDetailPage() {
               </div>
             </div>
 
-            <div className={`grid w-full gap-2 xl:max-w-xl ${canAccessAdminPanel ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+            <div className={`grid w-full gap-2 ${canAccessAdminPanel ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
               {canAccessAdminPanel && (
-                <button onClick={() => router.push(`/community/${id}/admin`)} className="community-cta community-cta-admin w-full px-5 py-2.5 text-sm">
+                <button onClick={() => router.push(`/community/${id}/admin`)} className="community-cta community-cta-admin flex min-h-[44px] w-full items-center justify-center px-5 py-2.5 text-sm">
                   Admin Panel
                 </button>
               )}
@@ -523,11 +564,11 @@ export default function CommunityDetailPage() {
                   setSelectedApprovedThemeId(approvedThemes[0]?.id || "");
                   setShowGeneratePostsModal(true);
                 }}
-                className="community-cta community-cta-generate w-full px-5 py-2.5 text-sm"
+                className="community-cta community-cta-generate flex min-h-[44px] w-full items-center justify-center px-5 py-2.5 text-sm"
               >
                 Generate Posts
               </button>
-              <button onClick={() => openInviteModal(id)} className="community-cta community-cta-invite w-full px-5 py-2.5 text-sm">
+              <button onClick={() => openInviteModal(id)} className="community-cta community-cta-invite flex min-h-[44px] w-full items-center justify-center px-5 py-2.5 text-sm">
                 Invite Members
               </button>
             </div>
@@ -601,7 +642,7 @@ export default function CommunityDetailPage() {
                     >
                     {editingPostId !== post.id && (
                       <div className="absolute right-4 top-4 z-10 flex items-center gap-1.5">
-                        {post.status === "approved" ? (
+                        {post.status === "approved" && !post.facebookSchedule ? (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -704,6 +745,17 @@ export default function CommunityDetailPage() {
                     ) : (
                       <div className="flex-1 space-y-2">
                         <p className="line-clamp-3 text-sm text-[rgba(0,0,0,0.8)]">{post.content}</p>
+                        {post.facebookSchedule?.status === "scheduled" ? (
+                          <p className="text-xs font-semibold text-[#0066cc]">
+                            This post is scheduled for Facebook on{" "}
+                            {new Date(post.facebookSchedule.scheduledAt).toLocaleString()}.
+                          </p>
+                        ) : post.facebookSchedule?.status === "published" ? (
+                          <p className="text-xs font-semibold text-[#1d1d1f]">
+                            Published on Facebook at{" "}
+                            {new Date(post.facebookSchedule.scheduledAt).toLocaleString()}.
+                          </p>
+                        ) : null}
                         {post.status === "rejected" && post.rejectionReason ? (
                           <p className="text-xs text-[#1d1d1f]">Rejection reason: {post.rejectionReason}</p>
                         ) : null}
@@ -874,7 +926,7 @@ export default function CommunityDetailPage() {
       >
         <DialogTitle>Schedule Facebook Post</DialogTitle>
         <DialogDescription>
-          Set the date and time for this approved post. Scheduling is currently disabled.
+          Set date and time to schedule this approved post on Facebook automatically.
         </DialogDescription>
 
         <div className="mt-4 space-y-3">
@@ -978,5 +1030,3 @@ export default function CommunityDetailPage() {
     </div>
   );
 }
-
-
